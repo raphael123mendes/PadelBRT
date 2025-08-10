@@ -303,18 +303,14 @@
     return a;
   }
 
-  // Generate matches for 5 players mode (15 matches total)
-  // Rotations as per original rules
+  // Improved 5-player schedule generator with backtracking to avoid consecutive doubles repeats
   function generateMatchesFive(players) {
-    // Generate all possible doubles (pairs)
     let doubles = [];
     for(let i=0; i<players.length; i++) {
       for(let j=i+1; j<players.length; j++) {
         doubles.push([players[i], players[j]]);
       }
     }
-    // Total doubles = 10 for 5 players
-    // Generate all pairs of doubles that are disjoint and one player out
     let candidateMatches = [];
     for(let i=0; i<doubles.length; i++) {
       for(let j=i+1; j<doubles.length; j++) {
@@ -323,30 +319,10 @@
         const allPlayers = [...d1, ...d2];
         const uniquePlayers = new Set(allPlayers);
         if(uniquePlayers.size === 4) {
-          // Identify player out (5th player)
           const outPlayer = players.find(p => !uniquePlayers.has(p));
           candidateMatches.push({double1: d1, double2: d2, playerOut: outPlayer});
         }
       }
-    }
-    // We want a schedule of 15 matches where each player plays 4 games, no same doubles consecutive,
-    // and rotate who is out every 4 games.
-    // We'll randomize order, then check constraints in simplified way:
-    // Shuffle candidateMatches until one fits constraints or up to max tries
-
-    function validateSchedule(schedule) {
-      // Check playerOut rotation: every 4 games same playerOut, then rotate
-      for(let i=0; i<schedule.length; i++) {
-        let expectedOutPlayer = schedule[ Math.floor(i/4)*4 ].playerOut;
-        if(schedule[i].playerOut !== expectedOutPlayer) return false;
-      }
-      // Check no same doubles play twice consecutively
-      for(let i=1; i<schedule.length; i++) {
-        const prev = schedule[i-1];
-        const curr = schedule[i];
-        if(sameDoubles(prev, curr)) return false;
-      }
-      return true;
     }
 
     function sameDoubles(m1, m2) {
@@ -356,23 +332,34 @@
     }
 
     let schedule = [];
-    let tries = 0;
-    const MAX_TRIES = 20000;
-    while(tries < MAX_TRIES) {
-      const shuffled = shuffleArray(candidateMatches);
-      if(shuffled.length < 15) return shuffled; // safety fallback
-      let possible = shuffled.slice(0,15);
-      if(validateSchedule(possible)) {
-        schedule = possible;
-        break;
+    const usedIndices = new Set();
+    const TARGET = 15;
+    function expectedOutPlayerAtIndex(idx) {
+      return candidateMatches[Math.floor(idx / 4) * 4].playerOut;
+    }
+
+    function backtrack(idx) {
+      if(idx === TARGET) return true;
+      for(let i=0; i < candidateMatches.length; i++) {
+        if(usedIndices.has(i)) continue;
+        const candidate = candidateMatches[i];
+        if(candidate.playerOut !== expectedOutPlayerAtIndex(idx)) continue;
+        if(idx > 0 && sameDoubles(schedule[idx - 1], candidate)) continue;
+        schedule.push(candidate);
+        usedIndices.add(i);
+        if(backtrack(idx + 1)) return true;
+        schedule.pop();
+        usedIndices.delete(i);
       }
-      tries++;
+      return false;
     }
-    if(schedule.length === 0) {
-      // fallback: just first 15 candidate matches (may violate rules)
-      schedule = candidateMatches.slice(0,15);
+
+    const success = backtrack(0);
+
+    if(!success) {
+      schedule = candidateMatches.slice(0, TARGET);
     }
-    // Add timestamps and empty scores
+
     return schedule.map((m, idx) => ({
       id: idx+1,
       datetime: new Date().toISOString(),
@@ -385,29 +372,19 @@
     }));
   }
 
-  // Generate matches for 4 players mode
-  // Rotate doubles, no repeats consecutive, try all combinations evenly
+  // 4-player matches generator (unchanged)
   function generateMatchesFour(players) {
-    // Possible doubles (6 pairs)
     let doubles = [];
     for(let i=0; i<players.length; i++) {
       for(let j=i+1; j<players.length; j++) {
         doubles.push([players[i], players[j]]);
       }
     }
-    // Schedule matches of two doubles with no player overlap and no consecutive same doubles
-    // Generate all possible matches for 4 players: only 3 combos possible (since only 4 players)
-    // Pairs:
-    // Match combos:
-    // [0,5], [1,4], [2,3]
-    // We'll repeat those 3 matches several times (say 15 matches total)
-
     const possibleMatches = [
-      {double1: doubles[0], double2: doubles[5]}, // players 0&1 vs 2&3
-      {double1: doubles[1], double2: doubles[4]}, // players 0&2 vs 1&3
-      {double1: doubles[2], double2: doubles[3]}  // players 0&3 vs 1&2
+      {double1: doubles[0], double2: doubles[5]},
+      {double1: doubles[1], double2: doubles[4]},
+      {double1: doubles[2], double2: doubles[3]}
     ];
-    // Create a schedule by repeating those matches 5 times (15 matches)
     let schedule = [];
     for(let i=0; i<15; i++) {
       const match = possibleMatches[i % possibleMatches.length];
@@ -425,24 +402,20 @@
     return schedule;
   }
 
-  // Calculate leaderboard points and games played from matches
   function calculateLeaderboard() {
     let stats = {};
     players.forEach(p => stats[p] = {points:0, gamesPlayed:0});
     matches.forEach(match => {
-      if(match.scoreD1 === null || match.scoreD2 === null) return; // skip no score
-      // Add points for double 1 players
+      if(match.scoreD1 === null || match.scoreD2 === null) return;
       match.double1.forEach(p => {
         stats[p].points += match.scoreD1;
         stats[p].gamesPlayed++;
       });
-      // Add points for double 2 players
       match.double2.forEach(p => {
         stats[p].points += match.scoreD2;
         stats[p].gamesPlayed++;
       });
     });
-    // Add index: points/gamesPlayed (handle div 0)
     Object.keys(stats).forEach(p => {
       let sp = stats[p];
       sp.index = sp.gamesPlayed ? (sp.points / sp.gamesPlayed) : 0;
@@ -450,10 +423,8 @@
     return stats;
   }
 
-  // Render leaderboard table sorted by points desc, then index desc
   function renderLeaderboard() {
     const stats = calculateLeaderboard();
-    // Sort players by points desc then index desc
     const sorted = Object.entries(stats).sort((a,b) => {
       if(b[1].points !== a[1].points) return b[1].points - a[1].points;
       return b[1].index - a[1].index;
@@ -471,12 +442,10 @@
     });
   }
 
-  // Render match history table
   function renderMatchHistory() {
     matchHistoryTableBody.innerHTML = '';
     matches.forEach(match => {
       const tr = document.createElement('tr');
-      // Points per player cells (4 or 5 players)
       const ptsCells = players.map(p => {
         const val = match.pointsPerPlayer[p];
         return `<td>${val != null ? val : ''}</td>`;
@@ -497,7 +466,6 @@
     });
   }
 
-  // Render score entry inputs for current match
   function renderScoreEntry() {
     if(currentMatchIndex >= matches.length) {
       scoreEntryFieldsDiv.innerHTML = '<em>All matches completed.</em>';
@@ -537,7 +505,6 @@
     scoreEntryFieldsDiv.appendChild(createScoreInput(`Score for ${match.double2.join(' & ')}`, match.scoreD2, 'scoreD2'));
   }
 
-  // Calculate points per player for a match
   function calcPointsPerPlayer(match) {
     if(match.scoreD1 == null || match.scoreD2 == null) {
       match.pointsPerPlayer = {};
@@ -550,7 +517,6 @@
     match.pointsPerPlayer = pts;
   }
 
-  // Save score from inputs for current match and move to next
   function saveScore() {
     if(currentMatchIndex >= matches.length) return;
     const s1 = parseInt(document.getElementById('scoreD1').value);
@@ -573,7 +539,6 @@
     renderMatchHistory();
   }
 
-  // Persist to localStorage if toggle is on
   function persistData() {
     if(!persistScores) return;
     const data = {
@@ -585,7 +550,6 @@
     localStorage.setItem('padelManagerData', JSON.stringify(data));
   }
 
-  // Load from localStorage
   function loadData() {
     const dataRaw = localStorage.getItem('padelManagerData');
     if(!dataRaw) return false;
@@ -602,7 +566,6 @@
     }
   }
 
-  // Reset session
   function resetSession() {
     if(confirm('Reset session? All data will be lost.')) {
       localStorage.removeItem('padelManagerData');
@@ -610,13 +573,11 @@
     }
   }
 
-  // Export CSV logic
   function exportCSV() {
     if(matches.length === 0) {
       alert('No matches to export.');
       return;
     }
-    // Build header
     const header = [
       'Match #',
       'Date/Time',
@@ -630,7 +591,6 @@
       numPlayers === 5 ? 'Player Out' : ''
     ].filter(Boolean);
 
-    // Rows
     const rows = matches.map(m => {
       const base = [
         m.id,
@@ -642,7 +602,6 @@
         m.scoreD1 != null ? m.scoreD1 : '',
         m.scoreD2 != null ? m.scoreD2 : ''
       ];
-      // Points per player, blank if none
       const pts = players.map(p => {
         const val = m.pointsPerPlayer ? m.pointsPerPlayer[p] : null;
         return val != null ? val : '';
@@ -651,7 +610,6 @@
       return [...base, ...pts, outP];
     });
 
-    // CSV string with proper escaping
     function escapeCSV(val) {
       if(val == null) return '';
       val = val.toString();
@@ -663,7 +621,6 @@
 
     const csvContent = [header, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
 
-    // Trigger download
     const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -679,9 +636,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // Setup start session button handler
   startSessionBtn.addEventListener('click', () => {
-    // Collect player names
     const inputs = playerNamesInputsDiv.querySelectorAll('input[type=text]');
     const names = [];
     for(let input of inputs) {
@@ -694,7 +649,6 @@
     }
     players = names;
     numPlayers = players.length;
-    // Generate matches based on player count
     if(numPlayers === 5) {
       matches = generateMatchesFive(players);
     } else if(numPlayers === 4) {
@@ -712,12 +666,10 @@
     renderScoreEntry();
   });
 
-  // Save score button
   saveScoreBtn.addEventListener('click', () => {
     saveScore();
   });
 
-  // Persist toggle
   persistCheckbox.addEventListener('change', (e) => {
     persistScores = e.target.checked;
     if(!persistScores) {
@@ -727,17 +679,14 @@
     }
   });
 
-  // Reset session button
   resetSessionBtn.addEventListener('click', () => {
     resetSession();
   });
 
-  // Export CSV button
   exportCsvBtn.addEventListener('click', () => {
     exportCSV();
   });
 
-  // On load, try to restore session
   window.addEventListener('load', () => {
     if(loadData()) {
       setupScreen.style.display = 'none';
