@@ -1,640 +1,756 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Padel Manager — 5 players, doubles, scoreboard & history</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Padel Game Manager</title>
 <style>
-  :root{
-    --bg:#0b1220; --card:#0f1724; --muted:#9aa6b2; --accent:#22c1c3;
-    --sand1:#F7E7C4; --sand2:#F2D7A7; --sun:#FFB65E; --accent-dark:#D97A2B;
-    color-scheme:dark;
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+  body {
+    margin: 0; padding: 0;
+    font-family: 'Montserrat', sans-serif;
+    background: linear-gradient(135deg, #dba458, #70421f);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
-  html,body{height:100%;margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#e6eef6}
-  .wrap{max-width:1100px;margin:20px auto;padding:18px}
-  header{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  h1{margin:0;font-size:20px}
-  .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);margin-top:14px}
-  input.player{width:calc(20% - 8px);min-width:120px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-  button{background:var(--accent);border:none;padding:8px 12px;border-radius:10px;cursor:pointer;color:#041018;font-weight:700}
-  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);font-weight:700}
-  .games{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
-  @media(min-width:980px){.games{grid-template-columns:repeat(2,1fr)}}
-  .game{padding:12px;border-radius:12px;background:rgba(255,255,255,0.02);display:flex;flex-direction:column;gap:10px;border:1px solid rgba(255,255,255,0.02)}
-  .game h3{margin:0;font-size:14px}
-  .pair{display:flex;gap:12px;align-items:center}
-  .team{flex:1;padding:10px;border-radius:10px;background:rgba(0,0,0,0.18);display:flex;justify-content:space-between;align-items:center}
-  .score-controls{display:flex;gap:8px;align-items:center}
-  .small{font-size:12px;color:var(--muted)}
-  .leaderboard{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  table.leader{width:100%;border-collapse:collapse;margin-top:8px}
-  table.leader th, table.leader td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03)}
-  .history{margin-top:12px;max-height:360px;overflow:auto}
-  .history-item{padding:8px;border-radius:8px;background:rgba(0,0,0,0.12);margin-bottom:8px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-  .history-left{flex:1}
-  .pill-winner{padding:6px 8px;border-radius:999px;background:linear-gradient(90deg,#7bffb0,#3dbf8b);color:#052015;font-weight:700}
-  .pill-loser{padding:6px 8px;border-radius:999px;background:linear-gradient(90deg,#ffd9a8,#ffb66b);color:#2b1300;font-weight:700}
-  .actions{margin-left:auto;display:flex;gap:8px;align-items:center}
-  footer{margin-top:18px;font-size:12px;color:var(--muted)}
-  /* Desert theme */
-  .desert-bg{
-    background: linear-gradient(180deg,#FFDFAE 0%, #F5C98F 45%, #F1B36A 100%);
-    color:#2b1f12;
+  header {
+    text-align: center;
+    margin: 1rem 0 0.5rem 0;
+    font-weight: 700;
+    font-size: 1.8rem;
+    text-shadow: 0 0 6px #b87532;
   }
-  .desert .card{background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.45)); color:#2b1f12}
-  .desert button{background:var(--accent-dark); color:#fff}
-  .theme-toggle{border-radius:999px;padding:8px 12px;border:1px solid rgba(0,0,0,0.08);background:transparent;font-weight:700;cursor:pointer}
-  /* Padel ball style */
-  .ball{
-    width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;border:3px solid rgba(255,255,255,0.12);
-    background:radial-gradient(circle at 30% 30%, #fff, transparent 30%);box-shadow:0 6px 18px rgba(0,0,0,0.25);
+  main {
+    width: 95vw;
+    max-width: 900px;
+    background: rgba(30,15,5,0.75);
+    border-radius: 12px;
+    box-shadow: 0 0 15px #b8741d;
+    padding: 15px 20px 30px 20px;
+    margin-bottom: 40px;
   }
-  .desert .ball{background: radial-gradient(circle at 30% 30%, #fff8c6, transparent 30%); box-shadow:0 8px 18px rgba(0,0,0,0.12)}
-  /* responsive tweaks */
-  @media(max-width:700px){
-    input.player{min-width:120px;width:48%}
-    .card{padding:12px}
-    .ball{width:40px;height:40px}
+  label {
+    display: block;
+    margin-top: 10px;
+    font-weight: 600;
+  }
+  select, input[type=text] {
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: none;
+    font-size: 1rem;
+    margin-top: 4px;
+    width: 100%;
+    max-width: 280px;
+  }
+  button {
+    margin-top: 12px;
+    background: linear-gradient(45deg, #e6ba4b, #a9691b);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    padding: 10px 18px;
+    font-size: 1.1rem;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 0 12px #e6ba4b;
+    display: inline-flex;
+    align-items: center;
+  }
+  button:hover {
+    background: linear-gradient(45deg, #f0ca66, #c37f29);
+    box-shadow: 0 0 18px #f0ca66;
+  }
+  button svg {
+    width: 20px; height: 20px; margin-right: 8px;
+    fill: #fff;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    font-size: 0.9rem;
+  }
+  thead {
+    background: rgba(184, 135, 37, 0.9);
+    font-weight: 700;
+  }
+  th, td {
+    padding: 6px 8px;
+    text-align: center;
+    border: 1px solid #b87f16;
+    vertical-align: middle;
+  }
+  tbody tr:nth-child(odd) {
+    background: rgba(255 255 255 / 0.05);
+  }
+  input.score-input {
+    width: 40px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255 255 255 / 0.15);
+    color: #fff;
+  }
+  input.score-input:focus {
+    outline: 2px solid #e6ba4b;
+    background: rgba(255 255 255 / 0.3);
+  }
+  .flex-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-top: 8px;
+  }
+  .player-input {
+    flex: 1 1 140px;
+  }
+  .score-entry {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #b87f16;
+  }
+  .leaderboard-container, .match-history-container, .score-entry-container {
+    margin-top: 20px;
+  }
+  .toggle-persist {
+    margin-top: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .reset-btn {
+    margin-top: 16px;
+    background: #b85418;
+    box-shadow: 0 0 14px #b85418;
+  }
+  .reset-btn:hover {
+    background: #e6701e;
+    box-shadow: 0 0 18px #e6701e;
+  }
+  footer {
+    margin-top: auto;
+    padding: 12px;
+    font-size: 0.9rem;
+    color: #b8974f;
+    text-align: center;
+  }
+  /* Scroll horizontal for tables on small */
+  .scroll-table {
+    overflow-x: auto;
+  }
+  /* Responsive */
+  @media (max-width: 520px) {
+    .flex-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    input.score-input {
+      width: 100%;
+      max-width: 100%;
+    }
   }
 </style>
 </head>
 <body>
-  <div class="wrap" id="pageWrap">
-    <header style="align-items:center">
-      <div>
-        <h1>Padel Manager — Doubles (5 players)</h1>
-        <div class="small" id="subtitle">15 games • each player plays 4 consecutive games then sits out • doubles don't play consecutive games</div>
-      </div>
+<header>Padel Game Manager</header>
+<main>
 
-      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-        <button id="themeToggle" class="theme-toggle">Theme: Dark 🌙</button>
-        <button id="regen" class="">Regenerate schedule</button>
-        <button id="reset" class="secondary">Reset All</button>
-        <button id="export" class="secondary">Export JSON</button>
-        <button id="importBtn" class="secondary">Import JSON</button>
-      </div>
-    </header>
+<div id="setup-screen">
+  <label for="player-count">Number of players:</label>
+  <select id="player-count">
+    <option value="4">4 Players</option>
+    <option value="5" selected>5 Players</option>
+  </select>
+  <div id="player-names-inputs" style="margin-top:10px;">
+    <!-- Dynamic inputs for player names -->
+  </div>
+  <button id="start-session-btn">Start Session</button>
+</div>
 
-    <div class="card" style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label class="small">Player names:</label>
-        <input class="player" id="p0" placeholder="Player 1" value="Alice">
-        <input class="player" id="p1" placeholder="Player 2" value="Bob">
-        <input class="player" id="p2" placeholder="Player 3" value="Carlos">
-        <input class="player" id="p3" placeholder="Player 4" value="Diego">
-        <input class="player" id="p4" placeholder="Player 5" value="Emma">
-
-        <div style="margin-left:8px;display:flex;flex-direction:column">
-          <label class="small">Start bench:</label>
-          <select id="startBench"></select>
-        </div>
-
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button id="generate" class="secondary">Generate schedule</button>
-          <div class="small muted">Tip: generator will attempt alternatives if a startbench can't produce a valid schedule immediately.</div>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-        <div class="small muted">Match ends when a double reaches 3 games. Each player's points = sum of games their double won across finished matches.</div>
-        <div class="small muted">Match history persists in this browser until you press Reset.</div>
-      </div>
+<div id="app-screen" style="display:none;">
+  
+  <section class="score-entry-container">
+    <h2>Enter Game Scores</h2>
+    <div id="current-match-number" style="font-weight:700; margin-bottom:8px;"></div>
+    <div id="score-entry-fields" class="flex-row">
+      <!-- Dynamic score inputs -->
     </div>
+    <button id="save-score-btn">Save Score</button>
+    <label class="toggle-persist">
+      <input type="checkbox" id="persist-scores" checked /> Persist scores (local storage)
+    </label>
+    <button id="reset-session-btn" class="reset-btn">Reset Session</button>
+  </section>
 
-    <!-- Leaderboard -->
-    <div class="card" id="leaderboardCard">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <div>
-          <strong>Leaderboard</strong>
-          <div class="small muted">Sorted by Points (desc). Tie-break: fewer Games Played</div>
-        </div>
-        <div style="margin-left:auto">
-          <button id="sortByPoints" class="secondary">Sorted: Points ↓</button>
-        </div>
-      </div>
-
-      <table class="leader" id="leaderTable" aria-label="leaderboard">
+  <section class="leaderboard-container">
+    <h2>Leaderboard</h2>
+    <div class="scroll-table">
+      <table id="leaderboard-table">
         <thead>
           <tr>
             <th>Player</th>
             <th>Points</th>
-            <th>Games played</th>
+            <th>Games Played</th>
+            <th>Points/Game</th>
           </tr>
         </thead>
-        <tbody id="leaderBody"></tbody>
+        <tbody>
+          <!-- Dynamic leaderboard rows -->
+        </tbody>
       </table>
     </div>
+  </section>
 
-    <!-- Schedule & scoring -->
-    <div id="scheduleArea"></div>
-
-    <!-- History -->
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div>
-          <strong>Match History</strong>
-          <div class="small muted">Newest matches appear first. Click any match to expand details.</div>
-        </div>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button id="clearHistory" class="secondary">Clear History</button>
-        </div>
-      </div>
-
-      <div class="history" id="historyList"></div>
+  <section class="match-history-container">
+    <h2>Match History</h2>
+    <button id="export-csv-btn" title="Export match history as CSV">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.67v6h4v-6h3.67L12 2z"/></svg>
+      Download CSV
+    </button>
+    <div class="scroll-table" style="margin-top: 10px;">
+      <table id="match-history-table">
+        <thead>
+          <tr>
+            <th>Match #</th>
+            <th>Date/Time</th>
+            <th>Double 1 Player A</th>
+            <th>Double 1 Player B</th>
+            <th>Double 2 Player A</th>
+            <th>Double 2 Player B</th>
+            <th>Score Double 1</th>
+            <th>Score Double 2</th>
+            <th>Points Player A</th>
+            <th>Points Player B</th>
+            <th>Points Player C</th>
+            <th>Points Player D</th>
+            <th>Player Out</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dynamic match history rows -->
+        </tbody>
+      </table>
     </div>
+  </section>
 
-    <footer class="small muted">Single-file static app. Export JSON to backup or import to restore.</footer>
-  </div>
+</div>
+
+</main>
+<footer>Padel Manager © 2025 — Powered by Your Desert Padel</footer>
 
 <script>
-/* Padel Manager — single-file
-   - 5 players, 15 games
-   - rotation: bench = (start + gameIndex) % 5
-   - choose pairings to cover all unique matchup keys exactly once
-   - no same double plays consecutive games
-   - scoring: first to 3 wins; per-player points added to leaderboard
-   - persistent state in localStorage: 'padel_state_v2'
-   - theme saved in 'padel_theme'
-*/
+(() => {
+  // State
+  let players = [];
+  let numPlayers = 5;
+  let matches = [];
+  let currentMatchIndex = 0;
+  let persistScores = true;
 
-(function(){
-  // DOM refs
-  const pEls = [byId('p0'),byId('p1'),byId('p2'),byId('p3'),byId('p4')];
-  const startBenchSelect = byId('startBench');
-  const generateBtn = byId('generate');
-  const regenBtn = byId('regen');
-  const resetBtn = byId('reset');
-  const exportBtn = byId('export');
-  const importBtn = byId('importBtn');
-  const scheduleArea = byId('scheduleArea');
-  const leaderBody = byId('leaderBody');
-  const historyList = byId('historyList');
-  const themeToggle = byId('themeToggle');
-  const clearHistoryBtn = byId('clearHistory');
+  const setupScreen = document.getElementById('setup-screen');
+  const appScreen = document.getElementById('app-screen');
+  const playerCountSelect = document.getElementById('player-count');
+  const playerNamesInputsDiv = document.getElementById('player-names-inputs');
+  const startSessionBtn = document.getElementById('start-session-btn');
 
-  // localStorage key
-  const STORAGE_KEY = 'padel_state_v2';
-  const THEME_KEY = 'padel_theme';
+  const currentMatchNumberDiv = document.getElementById('current-match-number');
+  const scoreEntryFieldsDiv = document.getElementById('score-entry-fields');
+  const saveScoreBtn = document.getElementById('save-score-btn');
+  const persistCheckbox = document.getElementById('persist-scores');
+  const resetSessionBtn = document.getElementById('reset-session-btn');
 
-  // helpers
-  function byId(id){return document.getElementById(id)}
-  function getNames(){return pEls.map(e=>e.value.trim()||e.placeholder)}
-  function pairKey(pair){ const a=pair.slice().sort((x,y)=>x-y); return `${a[0]}-${a[1]}`; }
-  function matchupKey(pairA,pairB){ const k1=pairKey(pairA), k2=pairKey(pairB); return k1<k2?`${k1}|${k2}`:`${k2}|${k1}`; }
-  function allPairsOf4(players){
-    const [a,b,c,d] = players;
-    return [
-      [[a,b],[c,d]],
-      [[a,c],[b,d]],
-      [[a,d],[b,c]]
-    ];
-  }
-  function allMatchupsForBench(benchIndex){
-    const players = [0,1,2,3,4].filter(i=>i!==benchIndex);
-    return allPairsOf4(players).map(p=>({pairs:p, key:matchupKey(p[0],p[1]), bench:benchIndex}));
-  }
-  function shuffleArray(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]] } return arr; }
-  function fmtTime(ts){ const d=new Date(ts); return d.toLocaleString(); }
+  const leaderboardTableBody = document.querySelector('#leaderboard-table tbody');
+  const matchHistoryTableBody = document.querySelector('#match-history-table tbody');
+  const exportCsvBtn = document.getElementById('export-csv-btn');
 
-  // schedule search (backtracking)
-  function findSchedule(startBench){
-    const totalGames = 15;
-    const used = new Set();
-    const schedule = new Array(totalGames);
-    // precompute options per game
-    const options = [];
-    for(let g=0; g<totalGames; g++){
-      const bench = (startBench + g) % 5;
-      options.push(allMatchupsForBench(bench));
+  // Initialize player name inputs on setup screen
+  function renderPlayerNameInputs() {
+    playerNamesInputsDiv.innerHTML = '';
+    const count = parseInt(playerCountSelect.value);
+    for(let i=0; i < count; i++) {
+      const label = document.createElement('label');
+      label.textContent = `Player ${i+1} Name:`;
+      label.setAttribute('for', `player-name-${i}`);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = `player-name-${i}`;
+      input.value = `Player${i+1}`;
+      input.required = true;
+      input.classList.add('player-input');
+      playerNamesInputsDiv.appendChild(label);
+      playerNamesInputsDiv.appendChild(input);
     }
-    let solved = false;
-    function backtrack(g, lastDoubleKeys){
-      if(g===totalGames){ solved=true; return true; }
-      const opts = shuffleArray(options[g].slice());
-      for(const opt of opts){
-        if(used.has(opt.key)) continue;
-        const dA = pairKey(opt.pairs[0]), dB = pairKey(opt.pairs[1]);
-        if(lastDoubleKeys && (lastDoubleKeys.has(dA) || lastDoubleKeys.has(dB))) continue;
-        schedule[g] = {index:g, bench:opt.bench, pairs: [opt.pairs[0].slice(), opt.pairs[1].slice()], key: opt.key, scores:[0,0], finished:false};
-        used.add(opt.key);
-        const newLast = new Set([dA,dB]);
-        if(backtrack(g+1, newLast)) return true;
-        used.delete(opt.key);
-        schedule[g] = null;
+  }
+
+  playerCountSelect.addEventListener('change', () => {
+    renderPlayerNameInputs();
+  });
+
+  // Utility shuffle function
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    for(let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i+1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Generate matches for 5 players mode (15 matches total)
+  // Rotations as per original rules
+  function generateMatchesFive(players) {
+    // Generate all possible doubles (pairs)
+    let doubles = [];
+    for(let i=0; i<players.length; i++) {
+      for(let j=i+1; j<players.length; j++) {
+        doubles.push([players[i], players[j]]);
       }
+    }
+    // Total doubles = 10 for 5 players
+    // Generate all pairs of doubles that are disjoint and one player out
+    let candidateMatches = [];
+    for(let i=0; i<doubles.length; i++) {
+      for(let j=i+1; j<doubles.length; j++) {
+        const d1 = doubles[i];
+        const d2 = doubles[j];
+        const allPlayers = [...d1, ...d2];
+        const uniquePlayers = new Set(allPlayers);
+        if(uniquePlayers.size === 4) {
+          // Identify player out (5th player)
+          const outPlayer = players.find(p => !uniquePlayers.has(p));
+          candidateMatches.push({double1: d1, double2: d2, playerOut: outPlayer});
+        }
+      }
+    }
+    // We want a schedule of 15 matches where each player plays 4 games, no same doubles consecutive,
+    // and rotate who is out every 4 games.
+    // We'll randomize order, then check constraints in simplified way:
+    // Shuffle candidateMatches until one fits constraints or up to max tries
+
+    function validateSchedule(schedule) {
+      // Check playerOut rotation: every 4 games same playerOut, then rotate
+      for(let i=0; i<schedule.length; i++) {
+        let expectedOutPlayer = schedule[ Math.floor(i/4)*4 ].playerOut;
+        if(schedule[i].playerOut !== expectedOutPlayer) return false;
+      }
+      // Check no same doubles play twice consecutively
+      for(let i=1; i<schedule.length; i++) {
+        const prev = schedule[i-1];
+        const curr = schedule[i];
+        if(sameDoubles(prev, curr)) return false;
+      }
+      return true;
+    }
+
+    function sameDoubles(m1, m2) {
+      const setsEqual = (a,b) => a.length === b.length && a.every(v => b.includes(v));
+      return (setsEqual(m1.double1, m2.double1) && setsEqual(m1.double2, m2.double2)) ||
+             (setsEqual(m1.double1, m2.double2) && setsEqual(m1.double2, m2.double1));
+    }
+
+    let schedule = [];
+    let tries = 0;
+    const MAX_TRIES = 20000;
+    while(tries < MAX_TRIES) {
+      const shuffled = shuffleArray(candidateMatches);
+      if(shuffled.length < 15) return shuffled; // safety fallback
+      let possible = shuffled.slice(0,15);
+      if(validateSchedule(possible)) {
+        schedule = possible;
+        break;
+      }
+      tries++;
+    }
+    if(schedule.length === 0) {
+      // fallback: just first 15 candidate matches (may violate rules)
+      schedule = candidateMatches.slice(0,15);
+    }
+    // Add timestamps and empty scores
+    return schedule.map((m, idx) => ({
+      id: idx+1,
+      datetime: new Date().toISOString(),
+      double1: m.double1,
+      double2: m.double2,
+      playerOut: m.playerOut,
+      scoreD1: null,
+      scoreD2: null,
+      pointsPerPlayer: {}
+    }));
+  }
+
+  // Generate matches for 4 players mode
+  // Rotate doubles, no repeats consecutive, try all combinations evenly
+  function generateMatchesFour(players) {
+    // Possible doubles (6 pairs)
+    let doubles = [];
+    for(let i=0; i<players.length; i++) {
+      for(let j=i+1; j<players.length; j++) {
+        doubles.push([players[i], players[j]]);
+      }
+    }
+    // Schedule matches of two doubles with no player overlap and no consecutive same doubles
+    // Generate all possible matches for 4 players: only 3 combos possible (since only 4 players)
+    // Pairs:
+    // Match combos:
+    // [0,5], [1,4], [2,3]
+    // We'll repeat those 3 matches several times (say 15 matches total)
+
+    const possibleMatches = [
+      {double1: doubles[0], double2: doubles[5]}, // players 0&1 vs 2&3
+      {double1: doubles[1], double2: doubles[4]}, // players 0&2 vs 1&3
+      {double1: doubles[2], double2: doubles[3]}  // players 0&3 vs 1&2
+    ];
+    // Create a schedule by repeating those matches 5 times (15 matches)
+    let schedule = [];
+    for(let i=0; i<15; i++) {
+      const match = possibleMatches[i % possibleMatches.length];
+      schedule.push({
+        id: i+1,
+        datetime: new Date().toISOString(),
+        double1: match.double1,
+        double2: match.double2,
+        playerOut: null,
+        scoreD1: null,
+        scoreD2: null,
+        pointsPerPlayer: {}
+      });
+    }
+    return schedule;
+  }
+
+  // Calculate leaderboard points and games played from matches
+  function calculateLeaderboard() {
+    let stats = {};
+    players.forEach(p => stats[p] = {points:0, gamesPlayed:0});
+    matches.forEach(match => {
+      if(match.scoreD1 === null || match.scoreD2 === null) return; // skip no score
+      // Add points for double 1 players
+      match.double1.forEach(p => {
+        stats[p].points += match.scoreD1;
+        stats[p].gamesPlayed++;
+      });
+      // Add points for double 2 players
+      match.double2.forEach(p => {
+        stats[p].points += match.scoreD2;
+        stats[p].gamesPlayed++;
+      });
+    });
+    // Add index: points/gamesPlayed (handle div 0)
+    Object.keys(stats).forEach(p => {
+      let sp = stats[p];
+      sp.index = sp.gamesPlayed ? (sp.points / sp.gamesPlayed) : 0;
+    });
+    return stats;
+  }
+
+  // Render leaderboard table sorted by points desc, then index desc
+  function renderLeaderboard() {
+    const stats = calculateLeaderboard();
+    // Sort players by points desc then index desc
+    const sorted = Object.entries(stats).sort((a,b) => {
+      if(b[1].points !== a[1].points) return b[1].points - a[1].points;
+      return b[1].index - a[1].index;
+    });
+    leaderboardTableBody.innerHTML = '';
+    sorted.forEach(([p, s]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${p}</td>
+        <td>${s.points}</td>
+        <td>${s.gamesPlayed}</td>
+        <td>${s.index.toFixed(2)}</td>
+      `;
+      leaderboardTableBody.appendChild(tr);
+    });
+  }
+
+  // Render match history table
+  function renderMatchHistory() {
+    matchHistoryTableBody.innerHTML = '';
+    matches.forEach(match => {
+      const tr = document.createElement('tr');
+      // Points per player cells (4 or 5 players)
+      const ptsCells = players.map(p => {
+        const val = match.pointsPerPlayer[p];
+        return `<td>${val != null ? val : ''}</td>`;
+      }).join('');
+      tr.innerHTML = `
+        <td>${match.id}</td>
+        <td>${new Date(match.datetime).toLocaleString()}</td>
+        <td>${match.double1[0]}</td>
+        <td>${match.double1[1]}</td>
+        <td>${match.double2[0]}</td>
+        <td>${match.double2[1]}</td>
+        <td>${match.scoreD1 != null ? match.scoreD1 : ''}</td>
+        <td>${match.scoreD2 != null ? match.scoreD2 : ''}</td>
+        ${ptsCells}
+        <td>${match.playerOut || ''}</td>
+      `;
+      matchHistoryTableBody.appendChild(tr);
+    });
+  }
+
+  // Render score entry inputs for current match
+  function renderScoreEntry() {
+    if(currentMatchIndex >= matches.length) {
+      scoreEntryFieldsDiv.innerHTML = '<em>All matches completed.</em>';
+      currentMatchNumberDiv.textContent = '';
+      saveScoreBtn.disabled = true;
+      return;
+    }
+    const match = matches[currentMatchIndex];
+    currentMatchNumberDiv.textContent = `Match #${match.id} - ${match.double1.join(' & ')} vs ${match.double2.join(' & ')}`;
+    saveScoreBtn.disabled = false;
+    scoreEntryFieldsDiv.innerHTML = '';
+
+    const createScoreInput = (labelText, initialValue, id) => {
+      const div = document.createElement('div');
+      div.style.textAlign = 'center';
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      label.setAttribute('for', id);
+      label.style.fontWeight = '600';
+      label.style.display = 'block';
+      label.style.marginBottom = '4px';
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = 0;
+      input.max = 3;
+      input.id = id;
+      input.className = 'score-input';
+      input.value = initialValue != null ? initialValue : '';
+      input.setAttribute('inputmode', 'numeric');
+      input.required = true;
+      div.appendChild(label);
+      div.appendChild(input);
+      return div;
+    };
+
+    scoreEntryFieldsDiv.appendChild(createScoreInput(`Score for ${match.double1.join(' & ')}`, match.scoreD1, 'scoreD1'));
+    scoreEntryFieldsDiv.appendChild(createScoreInput(`Score for ${match.double2.join(' & ')}`, match.scoreD2, 'scoreD2'));
+  }
+
+  // Calculate points per player for a match
+  function calcPointsPerPlayer(match) {
+    if(match.scoreD1 == null || match.scoreD2 == null) {
+      match.pointsPerPlayer = {};
+      return;
+    }
+    const pts = {};
+    match.double1.forEach(p => pts[p] = match.scoreD1);
+    match.double2.forEach(p => pts[p] = match.scoreD2);
+    if(match.playerOut) pts[match.playerOut] = null;
+    match.pointsPerPlayer = pts;
+  }
+
+  // Save score from inputs for current match and move to next
+  function saveScore() {
+    if(currentMatchIndex >= matches.length) return;
+    const s1 = parseInt(document.getElementById('scoreD1').value);
+    const s2 = parseInt(document.getElementById('scoreD2').value);
+    if(isNaN(s1) || isNaN(s2)) {
+      alert('Please enter numeric scores for both doubles.');
+      return;
+    }
+    if(s1 < 0 || s2 < 0 || s1 > 3 || s2 > 3) {
+      alert('Scores must be between 0 and 3.');
+      return;
+    }
+    matches[currentMatchIndex].scoreD1 = s1;
+    matches[currentMatchIndex].scoreD2 = s2;
+    calcPointsPerPlayer(matches[currentMatchIndex]);
+    currentMatchIndex++;
+    persistData();
+    renderScoreEntry();
+    renderLeaderboard();
+    renderMatchHistory();
+  }
+
+  // Persist to localStorage if toggle is on
+  function persistData() {
+    if(!persistScores) return;
+    const data = {
+      players,
+      numPlayers,
+      matches,
+      currentMatchIndex
+    };
+    localStorage.setItem('padelManagerData', JSON.stringify(data));
+  }
+
+  // Load from localStorage
+  function loadData() {
+    const dataRaw = localStorage.getItem('padelManagerData');
+    if(!dataRaw) return false;
+    try {
+      const data = JSON.parse(dataRaw);
+      if(!data.players || !data.matches) return false;
+      players = data.players;
+      numPlayers = data.numPlayers;
+      matches = data.matches;
+      currentMatchIndex = data.currentMatchIndex || 0;
+      return true;
+    } catch {
       return false;
     }
-    if(backtrack(0, null)) return schedule;
-    return null;
   }
 
-  // state shape:
-  // { names:[], startBench:int, schedule:[{...}], players:[{points,gamesPlayed}], history:[{gameIndex,ts, teams,score, deltas}], theme }
-  let state = null;
-
-  // UI: populate start bench options
-  function refreshStartOptions(){
-    const names = getNames();
-    startBenchSelect.innerHTML = '';
-    for(let i=0;i<5;i++){
-      const opt=document.createElement('option'); opt.value=i; opt.textContent=`${names[i]||('Player '+(i+1))} (bench first)`; startBenchSelect.appendChild(opt);
+  // Reset session
+  function resetSession() {
+    if(confirm('Reset session? All data will be lost.')) {
+      localStorage.removeItem('padelManagerData');
+      location.reload();
     }
   }
 
-  // Build new state with generated schedule
-  function buildNewState(startBench){
-    const names = getNames();
-    let schedule = null;
-    let sb = startBench;
-    // try multiple attempts (shuffle startbench if can't find)
-    for(let attempt=0; attempt<12; attempt++){
-      schedule = findSchedule(sb);
-      if(schedule) break;
-      sb = Math.floor(Math.random()*5);
+  // Export CSV logic
+  function exportCSV() {
+    if(matches.length === 0) {
+      alert('No matches to export.');
+      return;
     }
-    if(!schedule){ alert('Failed to generate schedule. Try pressing Regenerate.'); return null; }
-    schedule.forEach(s => { s.scores = [0,0]; s.finished = false; s.ts = null; });
-    const st = {
-      names,
-      startBench: sb,
-      schedule,
-      players: Array.from({length:5}, ()=>({points:0,gamesPlayed:0})),
-      history: []
-    };
-    return st;
-  }
+    // Build header
+    const header = [
+      'Match #',
+      'Date/Time',
+      'Double 1 Player A',
+      'Double 1 Player B',
+      'Double 2 Player A',
+      'Double 2 Player B',
+      'Score Double 1',
+      'Score Double 2',
+      ...players,
+      numPlayers === 5 ? 'Player Out' : ''
+    ].filter(Boolean);
 
-  // Render top leaderboard
-  function renderLeaderboard(){
-    leaderBody.innerHTML = '';
-    if(!state) return;
-    const names = state.names;
-    const ranking = state.players.map((p,i)=>({idx:i,name:names[i],...p}))
-      .sort((a,b) => b.points - a.points || a.gamesPlayed - b.gamesPlayed || a.name.localeCompare(b.name));
-    ranking.forEach(r=>{
-      const tr = document.createElement('tr');
-      const nameTd = document.createElement('td'); nameTd.textContent = r.name;
-      const ptsTd = document.createElement('td'); ptsTd.textContent = r.points;
-      const gpTd = document.createElement('td'); gpTd.textContent = r.gamesPlayed;
-      tr.appendChild(nameTd); tr.appendChild(ptsTd); tr.appendChild(gpTd);
-      leaderBody.appendChild(tr);
+    // Rows
+    const rows = matches.map(m => {
+      const base = [
+        m.id,
+        new Date(m.datetime).toLocaleString(),
+        m.double1[0],
+        m.double1[1],
+        m.double2[0],
+        m.double2[1],
+        m.scoreD1 != null ? m.scoreD1 : '',
+        m.scoreD2 != null ? m.scoreD2 : ''
+      ];
+      // Points per player, blank if none
+      const pts = players.map(p => {
+        const val = m.pointsPerPlayer ? m.pointsPerPlayer[p] : null;
+        return val != null ? val : '';
+      });
+      const outP = numPlayers === 5 ? (m.playerOut || '') : '';
+      return [...base, ...pts, outP];
     });
-  }
 
-  // Render schedule and controls
-  function renderSchedule(){
-    scheduleArea.innerHTML = '';
-    if(!state) return;
-    const frag = document.createDocumentFragment();
-
-    // bench info
-    const benchCard = document.createElement('div');
-    benchCard.className = 'card';
-    benchCard.innerHTML = `<div style="display:flex;align-items:center;gap:12px">
-      <div><strong>Start bench:</strong> ${state.names[state.startBench]}</div>
-      <div class="small muted">Bench rotates each game: bench = (start + gameIndex) % 5</div>
-    </div>`;
-    frag.appendChild(benchCard);
-
-    // games grid
-    const gamesGrid = document.createElement('div');
-    gamesGrid.className = 'games';
-    state.schedule.forEach((gobj, idx)=>{
-      const div = document.createElement('div'); div.className='game';
-      const benchName = state.names[gobj.bench];
-      const teamA = gobj.pairs[0].map(i=>state.names[i]).join(' + ');
-      const teamB = gobj.pairs[1].map(i=>state.names[i]).join(' + ');
-      const h = document.createElement('h3'); h.textContent = `Game ${idx+1} — Bench: ${benchName}`;
-      div.appendChild(h);
-
-      const pairRow = document.createElement('div'); pairRow.className='pair';
-      const left = document.createElement('div'); left.className='team'; left.innerHTML = `<div>${teamA}</div><div class="small muted">(${gobj.pairs[0].map(i=>'P'+(i+1)).join(',')})</div>`;
-      pairRow.appendChild(left);
-
-      const mid = document.createElement('div'); mid.style.display='flex'; mid.style.flexDirection='column'; mid.style.gap='8px'; mid.style.alignItems='center';
-      const scoreLabel = document.createElement('div'); scoreLabel.textContent = `${gobj.scores[0]} — ${gobj.scores[1]}`; scoreLabel.style.fontWeight='800'; scoreLabel.style.fontSize='18px';
-      mid.appendChild(scoreLabel);
-
-      const controls = document.createElement('div'); controls.className='score-controls';
-      const incA = document.createElement('button'); incA.innerHTML = `<span class="ball">+1</span>`; incA.title='Add 1 to Team A';
-      incA.onclick = ()=>{ if(!gobj.finished){ gobj.scores[0]=Math.min(3,gobj.scores[0]+1); tryAutoFinish(idx); saveState(); renderAll(); } };
-      const incB = document.createElement('button'); incB.innerHTML = `<span class="ball">+1</span>`; incB.title='Add 1 to Team B';
-      incB.onclick = ()=>{ if(!gobj.finished){ gobj.scores[1]=Math.min(3,gobj.scores[1]+1); tryAutoFinish(idx); saveState(); renderAll(); } };
-      const undo = document.createElement('button'); undo.textContent='Reset'; undo.className='secondary';
-      undo.onclick = ()=>{ if(!gobj.finished){ gobj.scores=[0,0]; saveState(); renderAll(); } };
-
-      controls.appendChild(incA); controls.appendChild(incB); controls.appendChild(undo);
-      mid.appendChild(controls);
-
-      pairRow.appendChild(mid);
-
-      const right = document.createElement('div'); right.className='team'; right.innerHTML = `<div>${teamB}</div><div class="small muted">(${gobj.pairs[1].map(i=>'P'+(i+1)).join(',')})</div>`;
-      pairRow.appendChild(right);
-
-      div.appendChild(pairRow);
-
-      // footer with status and actions
-      const footer = document.createElement('div'); footer.style.display='flex'; footer.style.alignItems='center'; footer.style.justifyContent='space-between';
-      const status = document.createElement('div'); status.className='small muted';
-      if(gobj.finished){
-        const winner = gobj.scores[0] > gobj.scores[1] ? 'A' : 'B';
-        status.innerHTML = `<strong>Finished</strong> — Winner: ${winner} (${gobj.scores[0]}–${gobj.scores[1]}) • ${gobj.ts ? fmtTime(gobj.ts) : ''}`;
-      } else {
-        status.innerHTML = `<span class="small muted">In progress / not started</span>`;
+    // CSV string with proper escaping
+    function escapeCSV(val) {
+      if(val == null) return '';
+      val = val.toString();
+      if(val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
       }
-      footer.appendChild(status);
-
-      const buttons = document.createElement('div'); buttons.style.display='flex'; buttons.style.gap='8px';
-      const markFinished = document.createElement('button'); markFinished.className='secondary'; markFinished.textContent='Mark finished';
-      markFinished.onclick = ()=>{
-        if(!gobj.finished){
-          if(gobj.scores[0]===3 || gobj.scores[1]===3){
-            finalizeMatch(idx);
-          } else {
-            if(confirm('No team has reached 3 yet. Mark finished anyway?')) finalizeMatch(idx);
-          }
-        }
-      };
-      const editBtn = document.createElement('button'); editBtn.className='secondary'; editBtn.textContent='Edit';
-      editBtn.onclick = ()=>{
-        const a = parseInt(prompt('Team A games (0-3)', gobj.scores[0]||0) || '0', 10);
-        const b = parseInt(prompt('Team B games (0-3)', gobj.scores[1]||0) || '0', 10);
-        if(Number.isFinite(a) && Number.isFinite(b) && a>=0 && b>=0 && a<=3 && b<=3){
-          gobj.scores=[a,b];
-          if(a===3 || b===3) finalizeMatch(idx);
-          else saveState();
-          renderAll();
-        } else alert('Invalid scores');
-      };
-      buttons.appendChild(markFinished); buttons.appendChild(editBtn);
-      footer.appendChild(buttons);
-
-      div.appendChild(footer);
-      gamesGrid.appendChild(div);
-    });
-
-    frag.appendChild(gamesGrid);
-    scheduleArea.appendChild(frag);
-  }
-
-  // try to auto-finish a match when someone reaches 3
-  function tryAutoFinish(idx){
-    const g = state.schedule[idx];
-    if(g.scores[0]===3 || g.scores[1]===3){
-      finalizeMatch(idx);
+      return val;
     }
-  }
 
-  // finalize match: mark finished, stamp ts, update players points/gamesPlayed, add history entry
-  function finalizeMatch(idx){
-    const g = state.schedule[idx];
-    if(g.finished) return;
-    g.finished = true;
-    g.ts = Date.now();
-    // Update players stats
-    const aScore = g.scores[0], bScore = g.scores[1];
-    const teamA = g.pairs[0], teamB = g.pairs[1];
-    // add points and gamesPlayed for participants
-    teamA.forEach(i => { state.players[i].points += aScore; state.players[i].gamesPlayed += 1; });
-    teamB.forEach(i => { state.players[i].points += bScore; state.players[i].gamesPlayed += 1; });
-    // add history entry with deltas per player (only participants of match get points; bench gets 0)
-    const deltas = Array(5).fill(0);
-    teamA.forEach(i => deltas[i] = aScore);
-    teamB.forEach(i => deltas[i] = bScore);
-    const historyEntry = {
-      gameIndex: idx,
-      ts: g.ts,
-      teams: { A: teamA.slice(), B: teamB.slice() },
-      score: [aScore, bScore],
-      deltas: deltas
-    };
-    // newest first
-    state.history.unshift(historyEntry);
-    saveState();
-    renderAll();
-  }
+    const csvContent = [header, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
 
-  // Render complete UI (leaderboard + schedule + history)
-  function renderAll(){
-    renderLeaderboard();
-    renderSchedule();
-    renderHistory();
-    saveState();
-  }
-
-  // Render history list
-  function renderHistory(){
-    historyList.innerHTML = '';
-    if(!state || !state.history) return;
-    // newest first already
-    state.history.forEach((h, i)=>{
-      const item = document.createElement('div'); item.className='history-item';
-      const left = document.createElement('div'); left.className='history-left';
-      const title = document.createElement('div'); title.innerHTML = `<strong>Game ${h.gameIndex+1}</strong> • ${fmtTime(h.ts)}`;
-      const teams = document.createElement('div'); teams.style.margin='6px 0';
-      const teamA = h.teams.A.map(i=>state.names[i]).join(' + ');
-      const teamB = h.teams.B.map(i=>state.names[i]).join(' + ');
-      const score = document.createElement('div');
-      score.innerHTML = `<span style="font-weight:800">${teamA}</span> <span class="small muted"> ${h.score[0]} — ${h.score[1]} </span> <span style="font-weight:800">${teamB}</span>`;
-      teams.appendChild(score);
-      left.appendChild(title); left.appendChild(teams);
-
-      // deltas breakdown
-      const deltaList = document.createElement('div'); deltaList.className='small muted';
-      const rows = [];
-      for(let i=0;i<state.names.length;i++){
-        rows.push(`${state.names[i]}: ${h.deltas[i] >= 0 ? '+' + h.deltas[i] : h.deltas[i]}`);
-      }
-      deltaList.innerHTML = rows.join(' • ');
-      left.appendChild(deltaList);
-
-      // winner pill
-      const winnerIdx = h.score[0] > h.score[1] ? 'A' : 'B';
-      const pill = document.createElement('div'); pill.style.minWidth='96px';
-      pill.innerHTML = `<div class="${winnerIdx==='A' ? 'pill-winner' : 'pill-loser'}">${winnerIdx==='A' ? 'Winner: Team A' : 'Winner: Team B'}</div>`;
-      item.appendChild(left);
-      item.appendChild(pill);
-
-      // expand to show participant numbers
-      item.onclick = ()=>{
-        alert(`Game ${h.gameIndex+1} details:\n\nTeams:\nTeam A: ${h.teams.A.map(i=>state.names[i]).join(' + ')}\nTeam B: ${h.teams.B.map(i=>state.names[i]).join(' + ')}\n\nScore: ${h.score[0]} — ${h.score[1]}\n\nDeltas:\n${state.names.map((n,i)=>`${n}: ${h.deltas[i]}`).join('\\n')}`);
-      };
-
-      historyList.appendChild(item);
-    });
-  }
-
-  // Save and load state
-  function saveState(){
-    if(!state) return;
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }catch(e){}
-  }
-  function loadState(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw){
-        const parsed = JSON.parse(raw);
-        // basic shape validation
-        if(parsed && parsed.names && Array.isArray(parsed.schedule)){
-          state = parsed;
-          // ensure arrays exist
-          state.players = state.players || Array.from({length:5}, ()=>({points:0,gamesPlayed:0}));
-          state.history = state.history || [];
-          // restore UI inputs
-          for(let i=0;i<5;i++) pEls[i].value = state.names[i] || pEls[i].placeholder;
-          refreshStartOptions();
-          startBenchSelect.value = state.startBench || 0;
-          return;
-        }
-      }
-    }catch(e){}
-    // fallback: generate fresh state
-    refreshStartOptions();
-    state = null;
-  }
-
-  // Export / Import
-  function exportJSON(){
-    if(!state) return alert('No schedule to export');
-    const copy = JSON.parse(JSON.stringify(state));
-    const blob = new Blob([JSON.stringify(copy,null,2)], {type:'application/json'});
+    // Trigger download
+    const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='padel_manager_export.json'; a.click();
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth()+1).padStart(2,'0');
+    const dd = String(today.getDate()).padStart(2,'0');
+    a.download = `padel_history_${yyyy}-${mm}-${dd}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-  function importJSON(){
-    const input = document.createElement('input'); input.type='file'; input.accept='application/json';
-    input.onchange = (e)=>{
-      const f = e.target.files[0]; if(!f) return;
-      const reader = new FileReader();
-      reader.onload = ev=>{
-        try{
-          const data = JSON.parse(ev.target.result);
-          if(!data.names || !Array.isArray(data.schedule)) throw new Error('Invalid format');
-          state = data;
-          // populate player inputs
-          for(let i=0;i<5;i++) pEls[i].value = state.names[i] || pEls[i].placeholder;
-          refreshStartOptions();
-          startBenchSelect.value = state.startBench || 0;
-          saveState();
-          renderAll();
-        }catch(err){ alert('Import failed: ' + err.message); }
-      };
-      reader.readAsText(f);
-    };
-    input.click();
-  }
 
-  // Reset all (confirm)
-  function resetAll(){
-    if(!confirm('This will clear the entire schedule, scores, and history. Are you sure?')) return;
-    localStorage.removeItem(STORAGE_KEY);
-    state = null;
-    // reset inputs to placeholders
-    for(let i=0;i<5;i++) pEls[i].value = pEls[i].placeholder;
-    refreshStartOptions();
-    renderAll();
-  }
-
-  // Clear history only
-  function clearHistory(){
-    if(!state) return;
-    if(!confirm('Clear match history only? (This will not change scores already applied)')) return;
-    state.history = [];
-    saveState();
-    renderHistory();
-  }
-
-  // Generate handler
-  function generateHandler(){
-    refreshStartOptions();
-    const sb = parseInt(startBenchSelect.value,10);
-    const newState = buildNewState(sb);
-    if(!newState) return;
-    // preserve theme if present
-    const prevTheme = (state && state.theme) || getStoredTheme();
-    newState.theme = prevTheme;
-    state = newState;
-    // save and render
-    saveState();
-    renderAll();
-  }
-
-  // Regenerate with random bench
-  function regenHandler(){
-    refreshStartOptions();
-    const rand = Math.floor(Math.random()*5);
-    startBenchSelect.value = rand;
-    generateHandler();
-  }
-
-  // Theme toggle
-  function applyTheme(theme){
-    const page = document.getElementById('pageWrap');
-    if(theme==='desert'){
-      document.body.classList.add('desert-bg');
-      document.body.classList.add('desert');
-      themeToggle.textContent = 'Theme: Desert 🏜️';
-      state && (state.theme='desert');
-    } else {
-      document.body.classList.remove('desert-bg');
-      document.body.classList.remove('desert');
-      themeToggle.textContent = 'Theme: Dark 🌙';
-      state && (state.theme='dark');
+  // Setup start session button handler
+  startSessionBtn.addEventListener('click', () => {
+    // Collect player names
+    const inputs = playerNamesInputsDiv.querySelectorAll('input[type=text]');
+    const names = [];
+    for(let input of inputs) {
+      const val = input.value.trim();
+      if(!val) {
+        alert('Please enter all player names.');
+        return;
+      }
+      names.push(val);
     }
-    try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
-    // small subtitle contrast for desert
-    const subtitle = document.getElementById('subtitle');
-    subtitle.style.color = theme==='desert' ? '#4b2e16' : '';
-  }
-  function toggleTheme(){
-    const cur = getStoredTheme();
-    const next = cur==='desert' ? 'dark' : 'desert';
-    applyTheme(next);
-  }
-  function getStoredTheme(){ return localStorage.getItem(THEME_KEY) || 'dark'; }
-
-  // finalize helpers
-  function renderAllAndSave(){ renderAll(); saveState(); }
-
-  // wire events
-  generateBtn.onclick = generateHandler;
-  regenBtn.onclick = regenHandler;
-  resetBtn.onclick = resetAll;
-  exportBtn.onclick = exportJSON;
-  importBtn.onclick = importJSON;
-  themeToggle.onclick = toggleTheme;
-  clearHistoryBtn.onclick = clearHistory;
-
-  // helper to render everything (used in buttons)
-  function renderAll(){
+    players = names;
+    numPlayers = players.length;
+    // Generate matches based on player count
+    if(numPlayers === 5) {
+      matches = generateMatchesFive(players);
+    } else if(numPlayers === 4) {
+      matches = generateMatchesFour(players);
+    } else {
+      alert('Only 4 or 5 players supported.');
+      return;
+    }
+    currentMatchIndex = 0;
+    persistScores = persistCheckbox.checked;
+    setupScreen.style.display = 'none';
+    appScreen.style.display = 'block';
     renderLeaderboard();
-    renderSchedule();
-    renderHistory();
-  }
+    renderMatchHistory();
+    renderScoreEntry();
+  });
 
-  // load initial state and theme
-  loadState();
-  // if no state, create default initial schedule automatically
-  if(!state) {
-    // set player input defaults already set by placeholders; refresh start bench
-    refreshStartOptions();
-    // generate a schedule with random startbench silently
-    const start = Math.floor(Math.random()*5);
-    state = buildNewState(start) || state;
-    saveState();
-  }
-  // apply theme (stored or default)
-  applyTheme(getStoredTheme());
-  // initial render
-  renderAll();
+  // Save score button
+  saveScoreBtn.addEventListener('click', () => {
+    saveScore();
+  });
 
-  // Expose for console debugging
-  window._padelManager = {state, saveState, renderAll, regenerate: regenHandler, exportJSON};
+  // Persist toggle
+  persistCheckbox.addEventListener('change', (e) => {
+    persistScores = e.target.checked;
+    if(!persistScores) {
+      localStorage.removeItem('padelManagerData');
+    } else {
+      persistData();
+    }
+  });
+
+  // Reset session button
+  resetSessionBtn.addEventListener('click', () => {
+    resetSession();
+  });
+
+  // Export CSV button
+  exportCsvBtn.addEventListener('click', () => {
+    exportCSV();
+  });
+
+  // On load, try to restore session
+  window.addEventListener('load', () => {
+    if(loadData()) {
+      setupScreen.style.display = 'none';
+      appScreen.style.display = 'block';
+      renderLeaderboard();
+      renderMatchHistory();
+      renderScoreEntry();
+    } else {
+      renderPlayerNameInputs();
+    }
+  });
+
+  renderPlayerNameInputs();
 
 })();
 </script>
