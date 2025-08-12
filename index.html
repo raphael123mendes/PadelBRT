@@ -150,6 +150,9 @@
       font-weight: 600;
       text-align: center;
     }
+
+    /* small admin controls row */
+    #controlsRow { display:flex; gap:12px; align-items:center; margin:8px 0; }
   </style>
 </head>
 <body>
@@ -165,9 +168,12 @@
 <div id="mainContainer" class="container" style="display:none;">
   <h1>Padel Manager</h1>
 
-  <label for="gameSetSelect">Select Game Set (by date):</label>
-  <select id="gameSetSelect"></select>
-  <button id="newSetBtn">New Set for Today</button>
+  <div id="controlsRow">
+    <label for="gameSetSelect">Select Game Set (by date):</label>
+    <select id="gameSetSelect"></select>
+    <button id="newSetBtn">New Set for Today</button>
+    <!-- editable checkbox will be inserted by script -->
+  </div>
 
   <label for="playerCount">Select Players (no mid-session switch):</label>
   <select id="playerCount" disabled>
@@ -193,46 +199,58 @@
   <button id="exportCsvBtn">Export Matches CSV</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
-  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U';
-  const sb = supabase.createClient(supabaseUrl, supabaseAnonKey);
+<!-- Use module import to avoid global naming conflicts and allow modern API -->
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-    // Elements
-    const loginSection = document.getElementById('loginSection');
+  (async () => {
+    // ---------- CONFIG ----------
+    const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U'; // <-- replace with your anon key
+    const sb = createClient(supabaseUrl, supabaseAnonKey);
+
+    // ---------- ELEMENTS (mapped to your original HTML IDs) ----------
+    const authContainer = document.getElementById('authContainer');
     const emailInput = document.getElementById('emailInput');
     const passwordInput = document.getElementById('passwordInput');
     const loginBtn = document.getElementById('loginBtn');
-    const signUpBtn = document.getElementById('signUpBtn');
-    const loginMessage = document.getElementById('loginMessage');
+    const signupBtn = document.getElementById('signupBtn');
+    const authMessage = document.getElementById('authMessage');
 
-    const appSection = document.getElementById('appSection');
-    const logoutBtn = document.getElementById('logoutBtn');
+    const mainContainer = document.getElementById('mainContainer');
     const gameSetSelect = document.getElementById('gameSetSelect');
-    const newGameSetBtn = document.getElementById('newGameSetBtn');
+    const newSetBtn = document.getElementById('newSetBtn');
     const playerCountSelect = document.getElementById('playerCount');
     const playerNamesInput = document.getElementById('playerNames');
     const roundsInput = document.getElementById('rounds');
     const generateBtn = document.getElementById('generateBtn');
-    const editableToggle = document.getElementById('editableToggle');
     const scheduleOutput = document.getElementById('scheduleOutput');
     const scoreboardDiv = document.getElementById('scoreboard');
     const matchListDiv = document.getElementById('matchList');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
 
-    // State
+    // create and insert editable toggle (so admin can flip editable)
+    const controlsRow = document.getElementById('controlsRow');
+    const editableLabel = document.createElement('label');
+    editableLabel.style.display = 'flex';
+    editableLabel.style.alignItems = 'center';
+    editableLabel.style.gap = '6px';
+    editableLabel.innerHTML = `<input type="checkbox" id="editableToggle" /> Allow editing`;
+    controlsRow.appendChild(editableLabel);
+    const editableToggle = document.getElementById('editableToggle');
+
+    // ---------- STATE ----------
     let user = null;
     let gameSets = [];
-    let currentGameSet = null; // {id, date, editable}
+    let currentGameSet = null; // {id, date, editable, player_count, rounds, player_names_json}
     let schedule = [];
-    let scores = [];
+    let scores = []; // { match_number, team1_score, team2_score }
     let players = [];
     let playerCount = 5;
     let rounds = 15;
     let playerStats = {};
 
-    // Helper to format Date YYYY-MM-DD
+    // ---------- HELPERS ----------
     function formatDate(d) {
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -240,28 +258,161 @@
       return `${yyyy}-${mm}-${dd}`;
     }
 
-    // Login / Signup
+    // keep your original schedulers
+    function scheduleFourPlayers(players, rounds) {
+      const combos = [
+        [[players[0], players[1]], [players[2], players[3]]],
+        [[players[0], players[2]], [players[1], players[3]]],
+        [[players[0], players[3]], [players[1], players[2]]]
+      ];
+      let sched = [];
+      for (let i=0;i<rounds;i++){
+        const c = combos[i % combos.length];
+        sched.push({ id: i+1, team1: c[0], team2: c[1], rest: [] });
+      }
+      return sched;
+    }
+    function scheduleFivePlayers(players, rounds) {
+      let sched = [];
+      let restingOrder = [...players];
+      for (let i=0;i<rounds;i++){
+        let rest = restingOrder[0];
+        let active = restingOrder.slice(1);
+        let team1, team2;
+        if (i % 2 === 0) {
+          team1 = [active[0], active[1]];
+          team2 = [active[2], active[3]];
+        } else {
+          team1 = [active[1], active[0]];
+          team2 = [active[3], active[2]];
+        }
+        sched.push({ id: i+1, team1, team2, rest: [rest] });
+        restingOrder.push(restingOrder.shift());
+      }
+      return sched;
+    }
+
+    function resetPlayerStats(playersArr) {
+      let stats = {};
+      playersArr.forEach(p => { stats[p] = { points:0, games:0, index:"0.00" }; });
+      return stats;
+    }
+    function calculatePlayerStats(scheduleArr, scoresArr) {
+      let stats = resetPlayerStats(players);
+      scoresArr.forEach(score => {
+        const match = scheduleArr.find(m => m.id === score.match_number);
+        if (!match) return;
+        const t1 = parseInt(score.team1_score,10)||0;
+        const t2 = parseInt(score.team2_score,10)||0;
+        match.team1.forEach(p => { stats[p].points += t1; stats[p].games++; });
+        match.team2.forEach(p => { stats[p].points += t2; stats[p].games++; });
+      });
+      Object.values(stats).forEach(s => { s.index = s.games>0 ? (s.points/s.games).toFixed(2) : "0.00"; });
+      return stats;
+    }
+
+    // ---------- UI RENDERERS (kept original) ----------
+    function renderSchedule() {
+      if (!schedule.length) {
+        scheduleOutput.innerHTML = "<p>No schedule generated.</p>";
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>Match #</th>
+        ${playerCount === 5 ? "<th>Resting</th>" : ""}
+        <th>Team 1</th><th>Team 2</th><th>Score Team 1</th><th>Score Team 2</th>
+      </tr></thead><tbody>`;
+      schedule.forEach(match => {
+        const restStr = playerCount === 5 ? `<td>${match.rest[0] || ''}</td>` : "";
+        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
+        const isEditable = currentGameSet && currentGameSet.editable;
+        html += `<tr data-matchid="${match.id}">
+          <td>${match.id}</td>
+          ${restStr}
+          <td>${match.team1.join(" & ")}</td>
+          <td>${match.team2.join(" & ")}</td>
+          <td><input class="score-input" type="number" min="0" max="99" value="${scoreEntry.team1_score ?? ''}" data-team="1" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
+          <td><input class="score-input" type="number" min="0" max="99" value="${scoreEntry.team2_score ?? ''}" data-team="2" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      scheduleOutput.innerHTML = html;
+
+      if (currentGameSet && currentGameSet.editable) {
+        document.querySelectorAll(".score-input").forEach(input => {
+          input.onchange = async (e) => {
+            const matchId = parseInt(e.target.dataset.match, 10);
+            const teamNum = e.target.dataset.team;
+            const val = e.target.value;
+            await saveScore(matchId, teamNum, val);
+          };
+        });
+      }
+    }
+
+    function renderScoreboard() {
+      playerStats = calculatePlayerStats(schedule, scores);
+      let html = `<table><thead><tr>
+        <th>Player</th><th>Points</th><th>Games Played</th><th>Points/Game Index</th>
+      </tr></thead><tbody>`;
+      Object.entries(playerStats).forEach(([player, stat]) => {
+        html += `<tr>
+          <td>${player}</td>
+          <td>${stat.points}</td>
+          <td>${stat.games}</td>
+          <td>${stat.index}</td>
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      scoreboardDiv.innerHTML = html;
+    }
+
+    function renderMatchHistory() {
+      if (!schedule.length) {
+        matchListDiv.innerHTML = "<p>No matches yet.</p>";
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>Match ID</th><th>Date/Time</th><th>Team 1</th><th>Team 1 Score</th><th>Team 2</th><th>Team 2 Score</th>
+        ${playerCount===5? "<th>Resting</th>":""}
+      </tr></thead><tbody>`;
+      schedule.forEach(match => {
+        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
+        const dt = new Date().toLocaleString();
+        html += `<tr>
+          <td>${match.id}</td>
+          <td>${dt}</td>
+          <td>${match.team1.join(" & ")}</td>
+          <td>${scoreEntry.team1_score ?? ""}</td>
+          <td>${match.team2.join(" & ")}</td>
+          <td>${scoreEntry.team2_score ?? ""}</td>
+          ${playerCount===5? `<td>${match.rest[0] || ''}</td>` : ""}
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      matchListDiv.innerHTML = html;
+    }
+
+    // ---------- DB + Auth FUNCTIONS ----------
     async function signIn(email, password) {
-      loginMessage.textContent = '';
+      authMessage.textContent = '';
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) {
-        loginMessage.textContent = 'Login failed: ' + error.message;
+        authMessage.textContent = 'Login failed: ' + error.message;
         return null;
       }
       return data.user;
     }
-
     async function signUp(email, password) {
-      loginMessage.textContent = '';
+      authMessage.textContent = '';
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) {
-        loginMessage.textContent = 'Signup failed: ' + error.message;
+        authMessage.textContent = 'Signup failed: ' + error.message;
         return null;
       }
-      loginMessage.textContent = 'Signup success. Please check your email for confirmation.';
+      authMessage.textContent = 'Signup success. Check your email to confirm.';
       return data.user;
     }
-
     async function signOut() {
       await sb.auth.signOut();
       user = null;
@@ -272,19 +423,16 @@
       showLogin();
     }
 
-    // Show login or app section
     function showLogin() {
-      loginSection.style.display = 'block';
-      appSection.style.display = 'none';
-      loginMessage.textContent = '';
+      authContainer.style.display = 'flex';
+      mainContainer.style.display = 'none';
+      authMessage.textContent = '';
     }
-
     function showApp() {
-      loginSection.style.display = 'none';
-      appSection.style.display = 'block';
+      authContainer.style.display = 'none';
+      mainContainer.style.display = 'flex';
     }
 
-    // Load game sets for user
     async function loadGameSets() {
       if (!user) return;
       const { data, error } = await sb
@@ -300,7 +448,6 @@
       populateGameSetSelect();
     }
 
-    // Populate dropdown with game sets by date
     function populateGameSetSelect() {
       gameSetSelect.innerHTML = '';
       if (gameSets.length === 0) {
@@ -318,19 +465,16 @@
         opt.text = gs.date + (gs.editable ? ' (Editable)' : ' (Locked)');
         gameSetSelect.add(opt);
       });
-      // Select first by default
       gameSetSelect.selectedIndex = 0;
       loadSelectedGameSet();
     }
 
-    // Load selected game set and its matches
     async function loadSelectedGameSet() {
       const gsId = gameSetSelect.value;
       if (!gsId) return;
       currentGameSet = gameSets.find(gs => gs.id == gsId);
       if (!currentGameSet) return;
 
-      // Load games for this set
       const { data, error } = await sb
         .from('games')
         .select('*')
@@ -340,13 +484,12 @@
         alert('Error loading games: ' + error.message);
         return;
       }
-      // Restore schedule & scores from DB
-      // schedule = reconstruct schedule array from DB (teams + rest info)
+
       schedule = data.map(g => ({
         id: g.match_number,
         team1: JSON.parse(g.team1),
         team2: JSON.parse(g.team2),
-        rest: JSON.parse(g.resting_players)
+        rest: JSON.parse(g.resting_players || '[]')
       }));
       scores = data.map(g => ({
         match_number: g.match_number,
@@ -354,23 +497,21 @@
         team2_score: g.team2_score
       }));
 
-      // Set player count and player names from currentGameSet (stored in JSON columns or text)
-      playerCount = currentGameSet.player_count;
-      rounds = currentGameSet.rounds;
-      players = JSON.parse(currentGameSet.player_names_json);
+      playerCount = currentGameSet.player_count || 5;
+      rounds = currentGameSet.rounds || schedule.length || 15;
+      players = currentGameSet.player_names_json ? JSON.parse(currentGameSet.player_names_json) : [];
 
       playerCountSelect.value = playerCount;
       roundsInput.value = rounds;
       playerNamesInput.value = players.join(',');
 
-      editableToggle.checked = currentGameSet.editable;
+      editableToggle.checked = !!currentGameSet.editable;
 
       renderSchedule();
       renderScoreboard();
       renderMatchHistory();
     }
 
-    // Clear schedule UI & data
     function clearSchedule() {
       schedule = [];
       scores = [];
@@ -386,17 +527,14 @@
       matchListDiv.innerHTML = '';
     }
 
-    // Create new game set for today (only one per day allowed)
     async function createNewGameSet() {
       if (!user) return;
       const today = formatDate(new Date());
-      // Check if exists a game_set for today
       const exists = gameSets.find(gs => gs.date === today);
       if (exists) {
-        alert("You already have a game set for today. Delete it first to create new.");
+        alert("A game set for today already exists. Delete it first to create new.");
         return;
       }
-      // Create new empty game set
       const { data, error } = await sb
         .from('game_sets')
         .insert({
@@ -413,35 +551,26 @@
         alert('Error creating game set: ' + error.message);
         return;
       }
-      gameSets.unshift(data); // add to list top
+      gameSets.unshift(data);
       populateGameSetSelect();
       gameSetSelect.value = data.id;
       await loadSelectedGameSet();
     }
 
-    // Save schedule + matches + scores into DB
     async function saveScheduleAndMatches() {
       if (!currentGameSet || !user) return;
-
-      // Validate player names count
       const names = playerNamesInput.value.split(',').map(s => s.trim()).filter(s => s);
       if (!validatePlayerNames(names, playerCountSelect.value)) {
         alert(`Please enter exactly ${playerCountSelect.value} player names.`);
         return;
       }
-
       players = names;
       playerCount = parseInt(playerCountSelect.value, 10);
       rounds = parseInt(roundsInput.value, 10);
 
-      // Generate schedule using existing functions
-      if (playerCount === 4) {
-        schedule = scheduleFourPlayers(players, rounds);
-      } else if (playerCount === 5) {
-        schedule = scheduleFivePlayers(players, rounds);
-      }
+      if (playerCount === 4) schedule = scheduleFourPlayers(players, rounds);
+      else schedule = scheduleFivePlayers(players, rounds);
 
-      // Save game set updated data (players, counts, rounds)
       const { error: updateSetErr } = await sb
         .from('game_sets')
         .update({
@@ -460,7 +589,6 @@
       currentGameSet.player_names_json = JSON.stringify(players);
       currentGameSet.editable = editableToggle.checked;
 
-      // Delete any existing games for this set (so we overwrite)
       const { error: delErr } = await sb
         .from('games')
         .delete()
@@ -470,7 +598,6 @@
         return;
       }
 
-      // Insert games with empty scores
       for (let match of schedule) {
         const { error: insErr } = await sb
           .from('games')
@@ -488,39 +615,27 @@
           return;
         }
       }
-
-      // Reload matches from DB
       await loadSelectedGameSet();
       alert('Schedule saved!');
     }
 
-    // Save score for a specific match and team
     async function saveScore(matchId, teamNum, val) {
       if (!currentGameSet || !currentGameSet.editable) {
         alert("This game set is locked from editing.");
-        loadSelectedGameSet(); // revert UI
+        await loadSelectedGameSet(); // revert UI
         return;
       }
       const parsedVal = parseInt(val, 10);
       if (isNaN(parsedVal) || parsedVal < 0) {
         alert("Score must be a non-negative number.");
-        loadSelectedGameSet();
+        await loadSelectedGameSet();
         return;
       }
-      // Find existing game record
-      const game = schedule.find(m => m.id === matchId);
-      if (!game) return;
-
-      // Update score locally
       let scoreEntry = scores.find(s => s.match_number === matchId);
-      if (!scoreEntry) {
-        scoreEntry = { match_number: matchId, team1_score: 0, team2_score: 0 };
-        scores.push(scoreEntry);
-      }
+      if (!scoreEntry) { scoreEntry = { match_number: matchId, team1_score:0, team2_score:0 }; scores.push(scoreEntry); }
       if (teamNum === "1") scoreEntry.team1_score = parsedVal;
-      else if (teamNum === "2") scoreEntry.team2_score = parsedVal;
+      else scoreEntry.team2_score = parsedVal;
 
-      // Update in DB
       const { error } = await sb
         .from('games')
         .update({
@@ -537,229 +652,89 @@
       renderMatchHistory();
     }
 
-    // Validate player names
     function validatePlayerNames(names, count) {
       if (names.length !== parseInt(count, 10)) return false;
       for (const n of names) if (!n) return false;
       return true;
     }
 
-    // Render schedule UI
-    function renderSchedule() {
-      if (!schedule.length) {
-        scheduleOutput.innerHTML = "<p>No schedule generated.</p>";
-        return;
-      }
-      let html = `<table><thead><tr>
-        <th>Match #</th>
-        ${playerCount === 5 ? "<th>Resting</th>" : ""}
-        <th>Team 1</th><th>Team 2</th><th>Score Team 1</th><th>Score Team 2</th>
-      </tr></thead><tbody>`;
-      schedule.forEach(match => {
-        const restStr = playerCount === 5 ? `<td>${match.rest[0]}</td>` : "";
-        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
-        const isEditable = currentGameSet && currentGameSet.editable;
-        html += `<tr data-matchid="${match.id}">
-          <td>${match.id}</td>
-          ${restStr}
-          <td>${match.team1.join(" & ")}</td>
-          <td>${match.team2.join(" & ")}</td>
-          <td><input class="score-input" type="number" min="0" max="10" value="${scoreEntry.team1_score}" data-team="1" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
-          <td><input class="score-input" type="number" min="0" max="10" value="${scoreEntry.team2_score}" data-team="2" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
-        </tr>`;
-      });
-      html += "</tbody></table>";
-      scheduleOutput.innerHTML = html;
-
-      if (currentGameSet && currentGameSet.editable) {
-        document.querySelectorAll(".score-input").forEach(input => {
-          input.onchange = async (e) => {
-            const matchId = parseInt(e.target.dataset.match, 10);
-            const teamNum = e.target.dataset.team;
-            const val = e.target.value;
-            await saveScore(matchId, teamNum, val);
-          };
-        });
-      }
-    }
-
-    // Render scoreboard UI
-    function renderScoreboard() {
-      playerStats = calculatePlayerStats(schedule, scores);
-      let html = `<table><thead><tr>
-        <th>Player</th><th>Points</th><th>Games Played</th><th>Points/Game Index</th>
-      </tr></thead><tbody>`;
-      Object.entries(playerStats).forEach(([player, stat]) => {
-        html += `<tr>
-          <td>${player}</td>
-          <td>${stat.points}</td>
-          <td>${stat.games}</td>
-          <td>${stat.index}</td>
-        </tr>`;
-      });
-      html += "</tbody></table>";
-      scoreboardDiv.innerHTML = html;
-    }
-
-    // Render match history UI
-    function renderMatchHistory() {
-      if (!schedule.length) {
-        matchListDiv.innerHTML = "<p>No matches yet.</p>";
-        return;
-      }
-      let html = `<table><thead><tr>
-        <th>Match ID</th>
-        <th>Date/Time</th>
-        <th>Team 1</th><th>Team 1 Score</th>
-        <th>Team 2</th><th>Team 2 Score</th>
-        ${playerCount === 5 ? "<th>Resting</th>" : ""}
-      </tr></thead><tbody>`;
-      schedule.forEach(match => {
-        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
-        const dt = new Date().toLocaleString();
-        html += `<tr>
-          <td>${match.id}</td>
-          <td>${dt}</td>
-          <td>${match.team1.join(" & ")}</td>
-          <td>${scoreEntry.team1_score || ""}</td>
-          <td>${match.team2.join(" & ")}</td>
-          <td>${scoreEntry.team2_score || ""}</td>
-          ${playerCount === 5 ? `<td>${match.rest[0]}</td>` : ""}
-        </tr>`;
-      });
-      html += "</tbody></table>";
-      matchListDiv.innerHTML = html;
-    }
-
-    // Calculate player stats (points/games/index)
-    function calculatePlayerStats(schedule, scores) {
-      let stats = {};
-      players.forEach(p => {
-        stats[p] = { points: 0, games: 0, index: "0.00" };
-      });
-      scores.forEach(score => {
-        let match = schedule.find(m => m.id === score.match_number);
-        if (!match) return;
-        const t1score = parseInt(score.team1_score, 10) || 0;
-        const t2score = parseInt(score.team2_score, 10) || 0;
-        match.team1.forEach(p => { stats[p].points += t1score; stats[p].games++; });
-        match.team2.forEach(p => { stats[p].points += t2score; stats[p].games++; });
-      });
-      Object.values(stats).forEach(s => {
-        s.index = s.games > 0 ? (s.points / s.games).toFixed(2) : "0.00";
-      });
-      return stats;
-    }
-
-    // Export CSV button handler
     function exportCsv() {
-      if (!schedule.length) {
-        alert("Generate or select a schedule first.");
-        return;
-      }
+      if (!schedule.length) { alert("Generate or select a schedule first."); return; }
       let csv = [];
       let headers = ["Match ID", "Team1 Player1", "Team1 Player2", "Team1 Score", "Team2 Player1", "Team2 Player2", "Team2 Score"];
       if (playerCount === 5) headers.push("Resting Player");
       csv.push(headers.join(","));
-
       schedule.forEach(match => {
         const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
-        let row = [
-          match.id,
-          match.team1[0],
-          match.team1[1],
-          scoreEntry.team1_score || "",
-          match.team2[0],
-          match.team2[1],
-          scoreEntry.team2_score || ""
-        ];
-        if (playerCount === 5) row.push(match.rest[0]);
+        let row = [ match.id, match.team1[0], match.team1[1], scoreEntry.team1_score || "", match.team2[0], match.team2[1], scoreEntry.team2_score || "" ];
+        if (playerCount === 5) row.push(match.rest[0] || "");
         csv.push(row.map(v => `"${v}"`).join(","));
       });
-
       const csvString = csv.join("\n");
       const blob = new Blob([csvString], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `padel_game_set_${currentGameSet.date}.csv`;
+      a.download = `padel_game_set_${currentGameSet ? currentGameSet.date : 'export'}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
 
-    // Event handlers
+    // ---------- EVENT HANDLERS ----------
     loginBtn.onclick = async () => {
       user = await signIn(emailInput.value.trim(), passwordInput.value.trim());
       if (user) {
-        loginMessage.textContent = '';
+        authMessage.textContent = '';
         await afterLogin();
       }
     };
-
-    signUpBtn.onclick = async () => {
+    signupBtn.onclick = async () => {
       const newUser = await signUp(emailInput.value.trim(), passwordInput.value.trim());
-      if (newUser) {
-        loginMessage.textContent = 'Signup success. Please check email to confirm.';
-      }
+      if (newUser) authMessage.textContent = 'Signup success. Check email.';
     };
-
-    logoutBtn.onclick = async () => {
-      await signOut();
-    };
-
-    newGameSetBtn.onclick = async () => {
-      await createNewGameSet();
-    };
-
-    gameSetSelect.onchange = async () => {
-      await loadSelectedGameSet();
-    };
-
-    generateBtn.onclick = async () => {
-      await saveScheduleAndMatches();
-    };
-
+    newSetBtn.onclick = async () => await createNewGameSet();
+    gameSetSelect.onchange = async () => await loadSelectedGameSet();
+    generateBtn.onclick = async () => await saveScheduleAndMatches();
     editableToggle.onchange = async () => {
       if (!currentGameSet) return;
-      const { error } = await sb
-        .from('game_sets')
-        .update({ editable: editableToggle.checked })
-        .eq('id', currentGameSet.id);
+      const { error } = await sb.from('game_sets').update({ editable: editableToggle.checked }).eq('id', currentGameSet.id);
       if (error) {
         alert('Error updating editable flag: ' + error.message);
-        editableToggle.checked = !editableToggle.checked; // revert
+        editableToggle.checked = !editableToggle.checked;
       } else {
         currentGameSet.editable = editableToggle.checked;
         renderSchedule();
       }
     };
+    exportCsvBtn.onclick = exportCsv;
 
-    exportCsvBtn.onclick = () => {
-      exportCsv();
-    };
-
-    // Check session on load
     async function afterLogin() {
-      user = sb.auth.getUser().then(r => r.data.user);
-      if (!user) {
-        showLogin();
-        return;
-      }
+      const { data: { user: gotUser } } = await sb.auth.getUser();
+      user = gotUser;
+      if (!user) { showLogin(); return; }
       showApp();
       await loadGameSets();
     }
 
-    // Init: check for active session
-    const { data: { session } } = await sb.auth.getSession();
-    if (session && session.user) {
-      user = session.user;
-      showApp();
-      await loadGameSets();
-    } else {
+    // ---------- INIT: check session ----------
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session && session.user) {
+        user = session.user;
+        showApp();
+        await loadGameSets();
+      } else {
+        showLogin();
+      }
+    } catch (e) {
+      console.error('Init session error', e);
       showLogin();
     }
+
   })();
 </script>
 
+</body>
+</html>
