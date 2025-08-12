@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Padel Manager - Scheduler & Scoring</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600&display=swap');
+    body {
+      margin: 0; padding: 20px;
+      background: linear-gradient(135deg, #42291a 0%, #f5d68f 100%);
+      font-family: 'Rajdhani', sans-serif;
+      color: #2c1b0f;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+    }
+    h1 {
+      margin-bottom: 5px;
+      color: #f2e4c9;
+      text-shadow: 0 0 8px #8a5a21;
+    }
+    label, select, input, button {
+      font-size: 1.1rem;
+      margin: 5px 0;
+      border-radius: 6px;
+    }
+    select, input[type=text], input[type=number] {
+      padding: 8px 10px;
+      border: none;
+      width: 280px;
+      box-sizing: border-box;
+      outline: none;
+      border: 2px solid #c3a66d;
+      background: #fff9e1;
+      color: #4d3b1b;
+      transition: border-color 0.3s ease;
+    }
+    select:focus, input[type=text]:focus, input[type=number]:focus {
+      border-color: #8a5a21;
+    }
+    button {
+      background: #8a5a21;
+      color: #f2e4c9;
+      border: none;
+      padding: 12px 22px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(138, 90, 33, 0.6);
+      transition: background-color 0.3s ease;
+      user-select: none;
+    }
+    button:hover {
+      background: #6b4413;
+    }
+    table {
+      margin-top: 25px;
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 900px;
+      background: #f5d68f;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 5px 15px rgb(69 44 16 / 0.7);
+      user-select: text;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: center;
+      border-bottom: 1px solid #c3a66d;
+      font-weight: 600;
+      color: #4d3b1b;
+    }
+    th {
+      background: #8a5a21;
+      color: #f2e4c9;
+      user-select: none;
+    }
+    input.score-input {
+      width: 48px;
+      padding: 6px 4px;
+      font-size: 1rem;
+      text-align: center;
+      border: 2px solid #c3a66d;
+      border-radius: 6px;
+      background: #fff9e1;
+      color: #4d3b1b;
+    }
+    .container {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #matchList {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    #exportCsvBtn {
+      margin-top: 15px;
+      background: #6b4413;
+    }
+    #persistenceToggle {
+      margin-left: 8px;
+      vertical-align: middle;
+      transform: scale(1.2);
+      cursor: pointer;
+      display: none; /* Hide, we won't use localStorage persistence */
+    }
+    #scoreboard {
+      margin-top: 25px;
+      max-width: 600px;
+      width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgb(69 44 16 / 0.7);
+      background: #f5d68f;
+      padding: 10px 0;
+    }
+    #scoreboard table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    /* Auth UI */
+    #authContainer {
+      display: flex;
+      flex-direction: column;
+      max-width: 320px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    #authContainer input {
+      margin-bottom: 10px;
+      font-size: 1rem;
+      padding: 10px;
+      border-radius: 6px;
+      border: 2px solid #c3a66d;
+      outline: none;
+    }
+    #authContainer button {
+      margin-bottom: 10px;
+    }
+    #authMessage {
+      min-height: 1.2em;
+      color: #f2e4c9;
+      text-shadow: 0 0 8px #8a5a21;
+      font-weight: 600;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div id="authContainer">
+  <input id="emailInput" type="email" placeholder="Email" />
+  <input id="passwordInput" type="password" placeholder="Password" />
+  <button id="loginBtn">Login</button>
+  <button id="signupBtn">Sign Up</button>
+  <p id="authMessage"></p>
+</div>
+
+<div id="mainContainer" class="container" style="display:none;">
+  <h1>Padel Manager</h1>
+
+  <label for="gameSetSelect">Select Game Set (by date):</label>
+  <select id="gameSetSelect"></select>
+  <button id="newSetBtn">New Set for Today</button>
+
+  <label for="playerCount">Select Players (no mid-session switch):</label>
+  <select id="playerCount" disabled>
+    <option value="4">4 Players</option>
+    <option value="5" selected>5 Players</option>
+  </select>
+
+  <label for="playerNames">Enter Player Names (comma separated):</label>
+  <input id="playerNames" type="text" placeholder="Alice,Bob,Charlie,David,Eva" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled>
+
+  <label for="rounds">Number of rounds (games):</label>
+  <input id="rounds" type="number" min="1" value="15" disabled />
+
+  <button id="generateBtn" disabled>Generate Schedule</button>
+
+  <div id="scheduleOutput"></div>
+
+  <div id="scoreboard"></div>
+
+  <h2>Match History (editable scores)</h2>
+  <div id="matchList"></div>
+
+  <button id="exportCsvBtn">Export Matches CSV</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  // --- Initialize Supabase ---
+  const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co'; // <=== Replace with your Supabase URL
+  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U'; // <=== Replace with your anon key
+  const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+  // Elements
+  const authContainer = document.getElementById('authContainer');
+  const mainContainer = document.getElementById('mainContainer');
+  const loginBtn = document.getElementById('loginBtn');
+  const signupBtn = document.getElementById('signupBtn');
+  const emailInput = document.getElementById('emailInput');
+  const passwordInput = document.getElementById('passwordInput');
+  const authMessage = document.getElementById('authMessage');
+
+  const gameSetSelect = document.getElementById('gameSetSelect');
+  const newSetBtn = document.getElementById('newSetBtn');
+
+  const playerCountSelect = document.getElementById("playerCount");
+  const playerNamesInput = document.getElementById("playerNames");
+  const roundsInput = document.getElementById("rounds");
+  const generateBtn = document.getElementById("generateBtn");
+  const scheduleOutput = document.getElementById("scheduleOutput");
+  const scoreboardDiv = document.getElementById("scoreboard");
+  const matchListDiv = document.getElementById("matchList");
+  const exportCsvBtn = document.getElementById("exportCsvBtn");
+
+  // State
+  let currentUser = null;
+  let currentGameSet = null;
+  let games = [];
+  let players = [];
+  let playerCount = 5;
+  let rounds = 15;
+  let scores = []; // Array of { id (game id), team1Score, team2Score }
+  let playerStats = {};
+
+  // --- AUTH FUNCTIONS ---
+
+  async function checkSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      authContainer.style.display = 'none';
+      mainContainer.style.display = 'flex';
+      await loadUserGameSets();
+    } else {
+      authContainer.style.display = 'flex';
+      mainContainer.style.display = 'none';
+    }
+  }
+
+  loginBtn.onclick = async () => {
+    authMessage.textContent = '';
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    if (!email || !password) {
+      authMessage.textContent = 'Please enter email and password.';
+      return;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      authMessage.textContent = `Login failed: ${error.message}`;
+    } else {
+      authMessage.textContent = 'Logged in!';
+      await checkSession();
+    }
+  };
+
+  signupBtn.onclick = async () => {
+    authMessage.textContent = '';
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    if (!email || !password) {
+      authMessage.textContent = 'Please enter email and password.';
+      return;
+    }
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      authMessage.textContent = `Signup failed: ${error.message}`;
+    } else {
+      authMessage.textContent = 'Signup successful! Check your email to confirm.';
+    }
+  };
+
+  // --- GAME SETS FUNCTIONS ---
+
+  async function loadUserGameSets() {
+    const { data, error } = await supabase
+      .from('game_sets')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('date', { ascending: false });
+
+    if (error) {
+      alert('Failed to load game sets: ' + error.message);
+      return;
+    }
+
+    gameSetSelect.innerHTML = '';
+    if (data.length === 0) {
+      gameSetSelect.innerHTML = '<option value="">-- No game sets available --</option>';
+      disableEditingUI(true);
+      currentGameSet = null;
+      games = [];
+      renderSchedule([]);
+      renderScoreboard({});
+      renderMatchHistory([]);
+      return;
+    }
+
+    data.forEach(set => {
+      const option = document.createElement('option');
+      option.value = set.id;
+      option.textContent = `${set.date} ${set.editable ? '(Editable)' : '(Locked)'}`;
+      gameSetSelect.appendChild(option);
+    });
+
+    // Select first available by default
+    gameSetSelect.value = data[0].id;
+    currentGameSet = data[0];
+    await loadGamesForSet(currentGameSet.id);
+  }
+
+  gameSetSelect.onchange = async () => {
+    const selectedId = gameSetSelect.value;
+    if (!selectedId) return;
+    const { data, error } = await supabase
+      .from('game_sets')
+      .select('*')
+      .eq('id', selectedId)
+      .single();
+
+    if (error) {
+      alert('Failed to load selected game set: ' + error.message);
+      return;
+    }
+    currentGameSet = data;
+    await loadGamesForSet(currentGameSet.id);
+  };
+
+  newSetBtn.onclick = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Check if set exists for today
+    const { data: existingSets, error } = await supabase
+      .from('game_sets')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .eq('date', today);
+
+    if (error) {
+      alert('Error checking existing sets: ' + error.message);
+      return;
+    }
+    if (existingSets.length > 0) {
+      alert('A game set for today already exists. Please delete it before creating a new one.');
+      return;
+    }
+
+    // Create new set for today, editable by default
+    const { data: newSet, error: insertError } = await supabase
+      .from('game_sets')
+      .insert([{ user_id: currentUser.id, date: today, editable: true }])
+      .select()
+      .single();
+
+    if (insertError) {
+      alert('Error creating new game set: ' + insertError.message);
+      return;
+    }
+
+    alert('New game set created for today.');
+    await loadUserGameSets();
+  };
+
+  // --- GAMES FUNCTIONS ---
+
+  async function loadGamesForSet(gameSetId) {
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .eq('game_set_id', gameSetId)
+      .order('id', { ascending: true });
+
+    if (error) {
+      alert('Failed to load games: ' + error.message);
+      return;
+    }
+
+    games = data || [];
+    // Extract players, rounds and playerCount from games or game_set
+    if (games.length > 0) {
+      // Assume all players can be extracted from games teams
+      let uniquePlayers = new Set();
+      games.forEach(g => {
+        g.team1_players = JSON.parse(g.team1_players_json);
+        g.team2_players = JSON.parse(g.team2_players_json);
+        g.resting_player = g.resting_player || null;
+        g.team1_players.forEach(p => uniquePlayers.add(p));
+        g.team2_players.forEach(p => uniquePlayers.add(p));
+        if (g.resting_player) uniquePlayers.add(g.resting_player);
+      });
+      players = Array.from(uniquePlayers);
+      playerCount = players.length;
+      rounds = games.length;
+      // Disable editing inputs (they come from DB)
+      disableEditingUI(true);
+    } else {
+      // No games - allow generate schedule from inputs
+      players = [];
+      playerCount = 5;
+      rounds = 15;
+      disableEditingUI(false);
+    }
+
+    scores = games.map(g => ({
+      id: g.id,
+      team1Score: g.team1_score,
+      team2Score: g.team2_score
+    }));
+
+    renderScheduleFromDb(games, currentGameSet.editable);
+    playerStats = calculatePlayerStatsFromGames(games);
+    renderScoreboard(playerStats);
+    renderMatchHistoryFromDb(games);
+  }
+
+  // Disable or enable editing controls based on whether games exist or editable flag
+  function disableEditingUI(disable) {
+    playerCountSelect.disabled = disable;
+    playerNamesInput.disabled = disable;
+    roundsInput.disabled = disable;
+    generateBtn.disabled = disable;
+    newSetBtn.disabled = !disable; // only allow new set creation if no games loaded
+  }
+
+  // --- ADAPTED RENDER FUNCTIONS ---
+
+  function renderScheduleFromDb(games, editable) {
+    if (!games.length) {
+      scheduleOutput.innerHTML = "<p>No schedule generated yet.</p>";
+      return;
+    }
+
+    let html = `<table><thead><tr>
+      <th>Match #</th>
+      ${playerCount === 5 ? "<th>Resting</th>" : ""}
+      <th>Team 1</th><th>Team 2</th><th>Score Team 1</th><th>Score Team 2</th>
+    </tr></thead><tbody>`;
+
+    games.forEach(match => {
+      const restStr = playerCount === 5 ? `<td>${match.resting_player || ""}</td>` : "";
+      const team1Players = JSON.parse(match.team1_players_json).join(" & ");
+      const team2Players = JSON.parse(match.team2_players_json).join(" & ");
+
+      html += `<tr data-gameid="${match.id}">
+        <td>${match.id}</td>
+        ${restStr}
+        <td>${team1Players}</td>
+        <td>${team2Players}</td>
+        <td><input class="score-input" type="number" min="0" max="3" pattern="[0-3]" inputmode="numeric" maxlength="1" value="${match.team1_score ?? ''}" data-team="1" data-gameid="${match.id}" ${editable ? '' : 'disabled'} /></td>
+        <td><input class="score-input" type="number" min="0" max="3" pattern="[0-3]" inputmode="numeric" maxlength="1" value="${match.team2_score ?? ''}" data-team="2" data-gameid="${match.id}" ${editable ? '' : 'disabled'} /></td>
+      </tr>`;
+   
