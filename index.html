@@ -195,33 +195,27 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-(() => {
-  // --- Initialize Supabase ---
-  const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co'; // <=== Replace with your Supabase URL
+  const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
   const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U'; // <=== Replace with your anon key
   const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-  // Elements
-  const authContainer = document.getElementById('authContainer');
-  const mainContainer = document.getElementById('mainContainer');
-  const loginBtn = document.getElementById('loginBtn');
-  const signupBtn = document.getElementById('signupBtn');
-  const emailInput = document.getElementById('emailInput');
-  const passwordInput = document.getElementById('passwordInput');
-  const authMessage = document.getElementById('authMessage');
-
-  const gameSetSelect = document.getElementById('gameSetSelect');
-  const newSetBtn = document.getElementById('newSetBtn');
-
-  const playerCountSelect = document.getElementById("playerCount");
-  const playerNamesInput = document.getElementById("playerNames");
-  const roundsInput = document.getElementById("rounds");
-  const generateBtn = document.getElementById("generateBtn");
-  const scheduleOutput = document.getElementById("scheduleOutput");
-  const scoreboardDiv = document.getElementById("scoreboard");
-  const matchListDiv = document.getElementById("matchList");
-  const exportCsvBtn = document.getElementById("exportCsvBtn");
-
+  document.getElementById('loginBtn').onclick = async () => {
+    console.log("Login clicked");
+    const email = document.getElementById('emailInput').value;
+    const password = document.getElementById('passwordInput').value;
+    if (!email || !password) {
+      alert('Enter email and password');
+      return;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert('Login error: ' + error.message);
+      console.error(error);
+    } else {
+      alert('Login success!');
+    }
+  };
+</script>
   // State
   let currentUser = null;
   let currentGameSet = null;
