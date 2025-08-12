@@ -243,7 +243,7 @@
     // Login / Signup
     async function signIn(email, password) {
       loginMessage.textContent = '';
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) {
         loginMessage.textContent = 'Login failed: ' + error.message;
         return null;
@@ -253,7 +253,7 @@
 
     async function signUp(email, password) {
       loginMessage.textContent = '';
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await sb.auth.signUp({ email, password });
       if (error) {
         loginMessage.textContent = 'Signup failed: ' + error.message;
         return null;
@@ -331,7 +331,7 @@
       if (!currentGameSet) return;
 
       // Load games for this set
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('games')
         .select('*')
         .eq('game_set_id', gsId)
