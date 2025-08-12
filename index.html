@@ -459,7 +459,7 @@
       alert("Please enter your email");
       return;
     }
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { redirectTo: 'https://yourdomain.com' } });
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { redirectTo: 'https://raphael123mendes.github.io/PadelBRT/' } });
     if (error) {
       alert("Failed to send magic link: " + error.message);
     } else {
