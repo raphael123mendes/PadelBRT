@@ -195,264 +195,572 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const supabaseUrl = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
-  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U'; // <=== Replace with your anon key
-  const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+  (async () => {
+    const supabaseUrl = 'YOUR_SUPABASE_URL';
+    const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-  document.getElementById('loginBtn').onclick = async () => {
-    console.log("Login clicked");
-    const email = document.getElementById('emailInput').value;
-    const password = document.getElementById('passwordInput').value;
-    if (!email || !password) {
-      alert('Enter email and password');
-      return;
-    }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert('Login error: ' + error.message);
-      console.error(error);
-    } else {
-      alert('Login success!');
-    }
-  };
-</script>
+    // Elements
+    const loginSection = document.getElementById('loginSection');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const signUpBtn = document.getElementById('signUpBtn');
+    const loginMessage = document.getElementById('loginMessage');
 
-  
-  // State
-  let currentUser = null;
-  let currentGameSet = null;
-  let games = [];
-  let players = [];
-  let playerCount = 5;
-  let rounds = 15;
-  let scores = []; // Array of { id (game id), team1Score, team2Score }
-  let playerStats = {};
+    const appSection = document.getElementById('appSection');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const gameSetSelect = document.getElementById('gameSetSelect');
+    const newGameSetBtn = document.getElementById('newGameSetBtn');
+    const playerCountSelect = document.getElementById('playerCount');
+    const playerNamesInput = document.getElementById('playerNames');
+    const roundsInput = document.getElementById('rounds');
+    const generateBtn = document.getElementById('generateBtn');
+    const editableToggle = document.getElementById('editableToggle');
+    const scheduleOutput = document.getElementById('scheduleOutput');
+    const scoreboardDiv = document.getElementById('scoreboard');
+    const matchListDiv = document.getElementById('matchList');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
 
-  // --- AUTH FUNCTIONS ---
+    // State
+    let user = null;
+    let gameSets = [];
+    let currentGameSet = null; // {id, date, editable}
+    let schedule = [];
+    let scores = [];
+    let players = [];
+    let playerCount = 5;
+    let rounds = 15;
+    let playerStats = {};
 
-  async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      currentUser = session.user;
-      authContainer.style.display = 'none';
-      mainContainer.style.display = 'flex';
-      await loadUserGameSets();
-    } else {
-      authContainer.style.display = 'flex';
-      mainContainer.style.display = 'none';
-    }
-  }
-
-  loginBtn.onclick = async () => {
-    authMessage.textContent = '';
-    const email = emailInput.value;
-    const password = passwordInput.value;
-    if (!email || !password) {
-      authMessage.textContent = 'Please enter email and password.';
-      return;
-    }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      authMessage.textContent = `Login failed: ${error.message}`;
-    } else {
-      authMessage.textContent = 'Logged in!';
-      await checkSession();
-    }
-  };
-
-  signupBtn.onclick = async () => {
-    authMessage.textContent = '';
-    const email = emailInput.value;
-    const password = passwordInput.value;
-    if (!email || !password) {
-      authMessage.textContent = 'Please enter email and password.';
-      return;
-    }
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      authMessage.textContent = `Signup failed: ${error.message}`;
-    } else {
-      authMessage.textContent = 'Signup successful! Check your email to confirm.';
-    }
-  };
-
-  // --- GAME SETS FUNCTIONS ---
-
-  async function loadUserGameSets() {
-    const { data, error } = await supabase
-      .from('game_sets')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('date', { ascending: false });
-
-    if (error) {
-      alert('Failed to load game sets: ' + error.message);
-      return;
+    // Helper to format Date YYYY-MM-DD
+    function formatDate(d) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
     }
 
-    gameSetSelect.innerHTML = '';
-    if (data.length === 0) {
-      gameSetSelect.innerHTML = '<option value="">-- No game sets available --</option>';
-      disableEditingUI(true);
+    // Login / Signup
+    async function signIn(email, password) {
+      loginMessage.textContent = '';
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        loginMessage.textContent = 'Login failed: ' + error.message;
+        return null;
+      }
+      return data.user;
+    }
+
+    async function signUp(email, password) {
+      loginMessage.textContent = '';
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        loginMessage.textContent = 'Signup failed: ' + error.message;
+        return null;
+      }
+      loginMessage.textContent = 'Signup success. Please check your email for confirmation.';
+      return data.user;
+    }
+
+    async function signOut() {
+      await supabase.auth.signOut();
+      user = null;
       currentGameSet = null;
-      games = [];
-      renderSchedule([]);
-      renderScoreboard({});
-      renderMatchHistory([]);
-      return;
+      gameSets = [];
+      schedule = [];
+      scores = [];
+      showLogin();
     }
 
-    data.forEach(set => {
-      const option = document.createElement('option');
-      option.value = set.id;
-      option.textContent = `${set.date} ${set.editable ? '(Editable)' : '(Locked)'}`;
-      gameSetSelect.appendChild(option);
-    });
-
-    // Select first available by default
-    gameSetSelect.value = data[0].id;
-    currentGameSet = data[0];
-    await loadGamesForSet(currentGameSet.id);
-  }
-
-  gameSetSelect.onchange = async () => {
-    const selectedId = gameSetSelect.value;
-    if (!selectedId) return;
-    const { data, error } = await supabase
-      .from('game_sets')
-      .select('*')
-      .eq('id', selectedId)
-      .single();
-
-    if (error) {
-      alert('Failed to load selected game set: ' + error.message);
-      return;
-    }
-    currentGameSet = data;
-    await loadGamesForSet(currentGameSet.id);
-  };
-
-  newSetBtn.onclick = async () => {
-    const today = new Date().toISOString().slice(0, 10);
-
-    // Check if set exists for today
-    const { data: existingSets, error } = await supabase
-      .from('game_sets')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .eq('date', today);
-
-    if (error) {
-      alert('Error checking existing sets: ' + error.message);
-      return;
-    }
-    if (existingSets.length > 0) {
-      alert('A game set for today already exists. Please delete it before creating a new one.');
-      return;
+    // Show login or app section
+    function showLogin() {
+      loginSection.style.display = 'block';
+      appSection.style.display = 'none';
+      loginMessage.textContent = '';
     }
 
-    // Create new set for today, editable by default
-    const { data: newSet, error: insertError } = await supabase
-      .from('game_sets')
-      .insert([{ user_id: currentUser.id, date: today, editable: true }])
-      .select()
-      .single();
-
-    if (insertError) {
-      alert('Error creating new game set: ' + insertError.message);
-      return;
+    function showApp() {
+      loginSection.style.display = 'none';
+      appSection.style.display = 'block';
     }
 
-    alert('New game set created for today.');
-    await loadUserGameSets();
-  };
-
-  // --- GAMES FUNCTIONS ---
-
-  async function loadGamesForSet(gameSetId) {
-    const { data, error } = await supabase
-      .from('games')
-      .select('*')
-      .eq('game_set_id', gameSetId)
-      .order('id', { ascending: true });
-
-    if (error) {
-      alert('Failed to load games: ' + error.message);
-      return;
+    // Load game sets for user
+    async function loadGameSets() {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('game_sets')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+      if (error) {
+        alert('Error loading game sets: ' + error.message);
+        return;
+      }
+      gameSets = data;
+      populateGameSetSelect();
     }
 
-    games = data || [];
-    // Extract players, rounds and playerCount from games or game_set
-    if (games.length > 0) {
-      // Assume all players can be extracted from games teams
-      let uniquePlayers = new Set();
-      games.forEach(g => {
-        g.team1_players = JSON.parse(g.team1_players_json);
-        g.team2_players = JSON.parse(g.team2_players_json);
-        g.resting_player = g.resting_player || null;
-        g.team1_players.forEach(p => uniquePlayers.add(p));
-        g.team2_players.forEach(p => uniquePlayers.add(p));
-        if (g.resting_player) uniquePlayers.add(g.resting_player);
+    // Populate dropdown with game sets by date
+    function populateGameSetSelect() {
+      gameSetSelect.innerHTML = '';
+      if (gameSets.length === 0) {
+        const opt = document.createElement('option');
+        opt.text = 'No game sets found';
+        opt.disabled = true;
+        gameSetSelect.add(opt);
+        currentGameSet = null;
+        clearSchedule();
+        return;
+      }
+      gameSets.forEach(gs => {
+        const opt = document.createElement('option');
+        opt.value = gs.id;
+        opt.text = gs.date + (gs.editable ? ' (Editable)' : ' (Locked)');
+        gameSetSelect.add(opt);
       });
-      players = Array.from(uniquePlayers);
-      playerCount = players.length;
-      rounds = games.length;
-      // Disable editing inputs (they come from DB)
-      disableEditingUI(true);
-    } else {
-      // No games - allow generate schedule from inputs
+      // Select first by default
+      gameSetSelect.selectedIndex = 0;
+      loadSelectedGameSet();
+    }
+
+    // Load selected game set and its matches
+    async function loadSelectedGameSet() {
+      const gsId = gameSetSelect.value;
+      if (!gsId) return;
+      currentGameSet = gameSets.find(gs => gs.id == gsId);
+      if (!currentGameSet) return;
+
+      // Load games for this set
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('game_set_id', gsId)
+        .order('match_number', { ascending: true });
+      if (error) {
+        alert('Error loading games: ' + error.message);
+        return;
+      }
+      // Restore schedule & scores from DB
+      // schedule = reconstruct schedule array from DB (teams + rest info)
+      schedule = data.map(g => ({
+        id: g.match_number,
+        team1: JSON.parse(g.team1),
+        team2: JSON.parse(g.team2),
+        rest: JSON.parse(g.resting_players)
+      }));
+      scores = data.map(g => ({
+        match_number: g.match_number,
+        team1_score: g.team1_score,
+        team2_score: g.team2_score
+      }));
+
+      // Set player count and player names from currentGameSet (stored in JSON columns or text)
+      playerCount = currentGameSet.player_count;
+      rounds = currentGameSet.rounds;
+      players = JSON.parse(currentGameSet.player_names_json);
+
+      playerCountSelect.value = playerCount;
+      roundsInput.value = rounds;
+      playerNamesInput.value = players.join(',');
+
+      editableToggle.checked = currentGameSet.editable;
+
+      renderSchedule();
+      renderScoreboard();
+      renderMatchHistory();
+    }
+
+    // Clear schedule UI & data
+    function clearSchedule() {
+      schedule = [];
+      scores = [];
       players = [];
       playerCount = 5;
       rounds = 15;
-      disableEditingUI(false);
+      playerCountSelect.value = playerCount;
+      roundsInput.value = rounds;
+      playerNamesInput.value = '';
+      editableToggle.checked = false;
+      scheduleOutput.innerHTML = '';
+      scoreboardDiv.innerHTML = '';
+      matchListDiv.innerHTML = '';
     }
 
-    scores = games.map(g => ({
-      id: g.id,
-      team1Score: g.team1_score,
-      team2Score: g.team2_score
-    }));
-
-    renderScheduleFromDb(games, currentGameSet.editable);
-    playerStats = calculatePlayerStatsFromGames(games);
-    renderScoreboard(playerStats);
-    renderMatchHistoryFromDb(games);
-  }
-
-  // Disable or enable editing controls based on whether games exist or editable flag
-  function disableEditingUI(disable) {
-    playerCountSelect.disabled = disable;
-    playerNamesInput.disabled = disable;
-    roundsInput.disabled = disable;
-    generateBtn.disabled = disable;
-    newSetBtn.disabled = !disable; // only allow new set creation if no games loaded
-  }
-
-  // --- ADAPTED RENDER FUNCTIONS ---
-
-  function renderScheduleFromDb(games, editable) {
-    if (!games.length) {
-      scheduleOutput.innerHTML = "<p>No schedule generated yet.</p>";
-      return;
+    // Create new game set for today (only one per day allowed)
+    async function createNewGameSet() {
+      if (!user) return;
+      const today = formatDate(new Date());
+      // Check if exists a game_set for today
+      const exists = gameSets.find(gs => gs.date === today);
+      if (exists) {
+        alert("You already have a game set for today. Delete it first to create new.");
+        return;
+      }
+      // Create new empty game set
+      const { data, error } = await supabase
+        .from('game_sets')
+        .insert({
+          user_id: user.id,
+          date: today,
+          editable: true,
+          player_count: 5,
+          rounds: 15,
+          player_names_json: JSON.stringify([])
+        })
+        .select()
+        .single();
+      if (error) {
+        alert('Error creating game set: ' + error.message);
+        return;
+      }
+      gameSets.unshift(data); // add to list top
+      populateGameSetSelect();
+      gameSetSelect.value = data.id;
+      await loadSelectedGameSet();
     }
 
-    let html = `<table><thead><tr>
-      <th>Match #</th>
-      ${playerCount === 5 ? "<th>Resting</th>" : ""}
-      <th>Team 1</th><th>Team 2</th><th>Score Team 1</th><th>Score Team 2</th>
-    </tr></thead><tbody>`;
+    // Save schedule + matches + scores into DB
+    async function saveScheduleAndMatches() {
+      if (!currentGameSet || !user) return;
 
-    games.forEach(match => {
-      const restStr = playerCount === 5 ? `<td>${match.resting_player || ""}</td>` : "";
-      const team1Players = JSON.parse(match.team1_players_json).join(" & ");
-      const team2Players = JSON.parse(match.team2_players_json).join(" & ");
+      // Validate player names count
+      const names = playerNamesInput.value.split(',').map(s => s.trim()).filter(s => s);
+      if (!validatePlayerNames(names, playerCountSelect.value)) {
+        alert(`Please enter exactly ${playerCountSelect.value} player names.`);
+        return;
+      }
 
-      html += `<tr data-gameid="${match.id}">
-        <td>${match.id}</td>
-        ${restStr}
-        <td>${team1Players}</td>
-        <td>${team2Players}</td>
-        <td><input class="score-input" type="number" min="0" max="3" pattern="[0-3]" inputmode="numeric" maxlength="1" value="${match.team1_score ?? ''}" data-team="1" data-gameid="${match.id}" ${editable ? '' : 'disabled'} /></td>
-        <td><input class="score-input" type="number" min="0" max="3" pattern="[0-3]" inputmode="numeric" maxlength="1" value="${match.team2_score ?? ''}" data-team="2" data-gameid="${match.id}" ${editable ? '' : 'disabled'} /></td>
-      </tr>`;
-   
+      players = names;
+      playerCount = parseInt(playerCountSelect.value, 10);
+      rounds = parseInt(roundsInput.value, 10);
+
+      // Generate schedule using existing functions
+      if (playerCount === 4) {
+        schedule = scheduleFourPlayers(players, rounds);
+      } else if (playerCount === 5) {
+        schedule = scheduleFivePlayers(players, rounds);
+      }
+
+      // Save game set updated data (players, counts, rounds)
+      const { error: updateSetErr } = await supabase
+        .from('game_sets')
+        .update({
+          player_count: playerCount,
+          rounds: rounds,
+          player_names_json: JSON.stringify(players),
+          editable: editableToggle.checked
+        })
+        .eq('id', currentGameSet.id);
+      if (updateSetErr) {
+        alert('Error updating game set: ' + updateSetErr.message);
+        return;
+      }
+      currentGameSet.player_count = playerCount;
+      currentGameSet.rounds = rounds;
+      currentGameSet.player_names_json = JSON.stringify(players);
+      currentGameSet.editable = editableToggle.checked;
+
+      // Delete any existing games for this set (so we overwrite)
+      const { error: delErr } = await supabase
+        .from('games')
+        .delete()
+        .eq('game_set_id', currentGameSet.id);
+      if (delErr) {
+        alert('Error deleting old games: ' + delErr.message);
+        return;
+      }
+
+      // Insert games with empty scores
+      for (let match of schedule) {
+        const { error: insErr } = await supabase
+          .from('games')
+          .insert({
+            game_set_id: currentGameSet.id,
+            match_number: match.id,
+            team1: JSON.stringify(match.team1),
+            team2: JSON.stringify(match.team2),
+            resting_players: JSON.stringify(match.rest),
+            team1_score: 0,
+            team2_score: 0
+          });
+        if (insErr) {
+          alert('Error inserting game: ' + insErr.message);
+          return;
+        }
+      }
+
+      // Reload matches from DB
+      await loadSelectedGameSet();
+      alert('Schedule saved!');
+    }
+
+    // Save score for a specific match and team
+    async function saveScore(matchId, teamNum, val) {
+      if (!currentGameSet || !currentGameSet.editable) {
+        alert("This game set is locked from editing.");
+        loadSelectedGameSet(); // revert UI
+        return;
+      }
+      const parsedVal = parseInt(val, 10);
+      if (isNaN(parsedVal) || parsedVal < 0) {
+        alert("Score must be a non-negative number.");
+        loadSelectedGameSet();
+        return;
+      }
+      // Find existing game record
+      const game = schedule.find(m => m.id === matchId);
+      if (!game) return;
+
+      // Update score locally
+      let scoreEntry = scores.find(s => s.match_number === matchId);
+      if (!scoreEntry) {
+        scoreEntry = { match_number: matchId, team1_score: 0, team2_score: 0 };
+        scores.push(scoreEntry);
+      }
+      if (teamNum === "1") scoreEntry.team1_score = parsedVal;
+      else if (teamNum === "2") scoreEntry.team2_score = parsedVal;
+
+      // Update in DB
+      const { error } = await supabase
+        .from('games')
+        .update({
+          team1_score: scoreEntry.team1_score,
+          team2_score: scoreEntry.team2_score
+        })
+        .eq('game_set_id', currentGameSet.id)
+        .eq('match_number', matchId);
+      if (error) {
+        alert('Error updating score: ' + error.message);
+        return;
+      }
+      renderScoreboard();
+      renderMatchHistory();
+    }
+
+    // Validate player names
+    function validatePlayerNames(names, count) {
+      if (names.length !== parseInt(count, 10)) return false;
+      for (const n of names) if (!n) return false;
+      return true;
+    }
+
+    // Render schedule UI
+    function renderSchedule() {
+      if (!schedule.length) {
+        scheduleOutput.innerHTML = "<p>No schedule generated.</p>";
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>Match #</th>
+        ${playerCount === 5 ? "<th>Resting</th>" : ""}
+        <th>Team 1</th><th>Team 2</th><th>Score Team 1</th><th>Score Team 2</th>
+      </tr></thead><tbody>`;
+      schedule.forEach(match => {
+        const restStr = playerCount === 5 ? `<td>${match.rest[0]}</td>` : "";
+        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
+        const isEditable = currentGameSet && currentGameSet.editable;
+        html += `<tr data-matchid="${match.id}">
+          <td>${match.id}</td>
+          ${restStr}
+          <td>${match.team1.join(" & ")}</td>
+          <td>${match.team2.join(" & ")}</td>
+          <td><input class="score-input" type="number" min="0" max="10" value="${scoreEntry.team1_score}" data-team="1" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
+          <td><input class="score-input" type="number" min="0" max="10" value="${scoreEntry.team2_score}" data-team="2" data-match="${match.id}" ${!isEditable ? 'disabled' : ''} /></td>
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      scheduleOutput.innerHTML = html;
+
+      if (currentGameSet && currentGameSet.editable) {
+        document.querySelectorAll(".score-input").forEach(input => {
+          input.onchange = async (e) => {
+            const matchId = parseInt(e.target.dataset.match, 10);
+            const teamNum = e.target.dataset.team;
+            const val = e.target.value;
+            await saveScore(matchId, teamNum, val);
+          };
+        });
+      }
+    }
+
+    // Render scoreboard UI
+    function renderScoreboard() {
+      playerStats = calculatePlayerStats(schedule, scores);
+      let html = `<table><thead><tr>
+        <th>Player</th><th>Points</th><th>Games Played</th><th>Points/Game Index</th>
+      </tr></thead><tbody>`;
+      Object.entries(playerStats).forEach(([player, stat]) => {
+        html += `<tr>
+          <td>${player}</td>
+          <td>${stat.points}</td>
+          <td>${stat.games}</td>
+          <td>${stat.index}</td>
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      scoreboardDiv.innerHTML = html;
+    }
+
+    // Render match history UI
+    function renderMatchHistory() {
+      if (!schedule.length) {
+        matchListDiv.innerHTML = "<p>No matches yet.</p>";
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>Match ID</th>
+        <th>Date/Time</th>
+        <th>Team 1</th><th>Team 1 Score</th>
+        <th>Team 2</th><th>Team 2 Score</th>
+        ${playerCount === 5 ? "<th>Resting</th>" : ""}
+      </tr></thead><tbody>`;
+      schedule.forEach(match => {
+        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
+        const dt = new Date().toLocaleString();
+        html += `<tr>
+          <td>${match.id}</td>
+          <td>${dt}</td>
+          <td>${match.team1.join(" & ")}</td>
+          <td>${scoreEntry.team1_score || ""}</td>
+          <td>${match.team2.join(" & ")}</td>
+          <td>${scoreEntry.team2_score || ""}</td>
+          ${playerCount === 5 ? `<td>${match.rest[0]}</td>` : ""}
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      matchListDiv.innerHTML = html;
+    }
+
+    // Calculate player stats (points/games/index)
+    function calculatePlayerStats(schedule, scores) {
+      let stats = {};
+      players.forEach(p => {
+        stats[p] = { points: 0, games: 0, index: "0.00" };
+      });
+      scores.forEach(score => {
+        let match = schedule.find(m => m.id === score.match_number);
+        if (!match) return;
+        const t1score = parseInt(score.team1_score, 10) || 0;
+        const t2score = parseInt(score.team2_score, 10) || 0;
+        match.team1.forEach(p => { stats[p].points += t1score; stats[p].games++; });
+        match.team2.forEach(p => { stats[p].points += t2score; stats[p].games++; });
+      });
+      Object.values(stats).forEach(s => {
+        s.index = s.games > 0 ? (s.points / s.games).toFixed(2) : "0.00";
+      });
+      return stats;
+    }
+
+    // Export CSV button handler
+    function exportCsv() {
+      if (!schedule.length) {
+        alert("Generate or select a schedule first.");
+        return;
+      }
+      let csv = [];
+      let headers = ["Match ID", "Team1 Player1", "Team1 Player2", "Team1 Score", "Team2 Player1", "Team2 Player2", "Team2 Score"];
+      if (playerCount === 5) headers.push("Resting Player");
+      csv.push(headers.join(","));
+
+      schedule.forEach(match => {
+        const scoreEntry = scores.find(s => s.match_number === match.id) || { team1_score: "", team2_score: "" };
+        let row = [
+          match.id,
+          match.team1[0],
+          match.team1[1],
+          scoreEntry.team1_score || "",
+          match.team2[0],
+          match.team2[1],
+          scoreEntry.team2_score || ""
+        ];
+        if (playerCount === 5) row.push(match.rest[0]);
+        csv.push(row.map(v => `"${v}"`).join(","));
+      });
+
+      const csvString = csv.join("\n");
+      const blob = new Blob([csvString], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `padel_game_set_${currentGameSet.date}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Event handlers
+    loginBtn.onclick = async () => {
+      user = await signIn(emailInput.value.trim(), passwordInput.value.trim());
+      if (user) {
+        loginMessage.textContent = '';
+        await afterLogin();
+      }
+    };
+
+    signUpBtn.onclick = async () => {
+      const newUser = await signUp(emailInput.value.trim(), passwordInput.value.trim());
+      if (newUser) {
+        loginMessage.textContent = 'Signup success. Please check email to confirm.';
+      }
+    };
+
+    logoutBtn.onclick = async () => {
+      await signOut();
+    };
+
+    newGameSetBtn.onclick = async () => {
+      await createNewGameSet();
+    };
+
+    gameSetSelect.onchange = async () => {
+      await loadSelectedGameSet();
+    };
+
+    generateBtn.onclick = async () => {
+      await saveScheduleAndMatches();
+    };
+
+    editableToggle.onchange = async () => {
+      if (!currentGameSet) return;
+      const { error } = await supabase
+        .from('game_sets')
+        .update({ editable: editableToggle.checked })
+        .eq('id', currentGameSet.id);
+      if (error) {
+        alert('Error updating editable flag: ' + error.message);
+        editableToggle.checked = !editableToggle.checked; // revert
+      } else {
+        currentGameSet.editable = editableToggle.checked;
+        renderSchedule();
+      }
+    };
+
+    exportCsvBtn.onclick = () => {
+      exportCsv();
+    };
+
+    // Check session on load
+    async function afterLogin() {
+      user = supabase.auth.getUser().then(r => r.data.user);
+      if (!user) {
+        showLogin();
+        return;
+      }
+      showApp();
+      await loadGameSets();
+    }
+
+    // Init: check for active session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && session.user) {
+      user = session.user;
+      showApp();
+      await loadGameSets();
+    } else {
+      showLogin();
+    }
+  })();
+</script>
+
