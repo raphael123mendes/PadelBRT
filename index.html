@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Padel Manager - Scheduler & Scoring</title>
+  <title>Padel Manager - Scheduler & Scoring with Auth</title>
   <style>
+    /* Your existing CSS here */
     @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600&display=swap');
     body {
       margin: 0; padding: 20px;
@@ -27,7 +28,7 @@
       margin: 5px 0;
       border-radius: 6px;
     }
-    select, input[type=text], input[type=number] {
+    select, input[type=text], input[type=number], input[type=email] {
       padding: 8px 10px;
       border: none;
       width: 280px;
@@ -38,7 +39,7 @@
       color: #4d3b1b;
       transition: border-color 0.3s ease;
     }
-    select:focus, input[type=text]:focus, input[type=number]:focus {
+    select:focus, input[type=text]:focus, input[type=number]:focus, input[type=email]:focus {
       border-color: #8a5a21;
     }
     button {
@@ -51,7 +52,6 @@
       box-shadow: 0 4px 10px rgba(138, 90, 33, 0.6);
       transition: background-color 0.3s ease;
       user-select: none;
-      margin-right: 8px;
     }
     button:hover {
       background: #6b4413;
@@ -100,13 +100,10 @@
       max-height: 300px;
       overflow-y: auto;
     }
-    #exportCsvBtn {
+    #exportCsvBtn, #saveSupabaseBtn {
       margin-top: 15px;
       background: #6b4413;
-    }
-    #saveSupabaseBtn {
-      margin-top: 15px;
-      background: #3b7a57;
+      margin-left: 10px;
     }
     #persistenceToggle {
       margin-left: 8px;
@@ -127,19 +124,42 @@
       width: 100%;
       border-collapse: collapse;
     }
-    /* Make buttons inline */
-    .btn-group {
-      margin-top: 15px;
+    /* Auth UI styling */
+    #authContainer {
+      background: #f5d68f;
+      box-shadow: 0 5px 15px rgb(69 44 16 / 0.7);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      width: 320px;
+      text-align: center;
+      color: #4d3b1b;
+      user-select: text;
+    }
+    #authStatus {
+      margin-top: 8px;
+      font-weight: 600;
     }
   </style>
-
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-  <h1>Padel Manager</h1>
+
+  <h1>Padel Manager (with User Login)</h1>
+
+  <!-- Auth UI -->
+  <div id="authContainer">
+    <input id="emailInput" type="email" placeholder="Enter your email" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    <button id="loginBtn">Send Magic Link</button>
+    <button id="logoutBtn" style="display:none;">Logout</button>
+    <p id="authStatus">Not logged in</p>
+  </div>
+
+  <label for="gameSetSelect">Load Saved Schedule:</label>
+  <select id="gameSetSelect">
+    <option value="">-- Login to see saved schedules --</option>
+  </select>
 
   <label for="playerCount">Select Players (no mid-session switch):</label>
   <select id="playerCount">
@@ -153,11 +173,8 @@
   <label for="rounds">Number of rounds (games):</label>
   <input id="rounds" type="number" min="1" value="15" />
 
-  <div class="btn-group">
-    <button id="generateBtn">Generate Schedule</button>
-    <button id="exportCsvBtn">Export Matches CSV</button>
-    <button id="saveSupabaseBtn">Save to Supabase</button>
-  </div>
+  <button id="generateBtn">Generate Schedule</button>
+  <button id="saveSupabaseBtn">Save Schedule & Scores to Supabase</button>
 
   <label><input type="checkbox" id="persistenceToggle" checked /> Persist scores between reloads</label>
 
@@ -168,38 +185,49 @@
   <h2>Match History (editable scores)</h2>
   <div id="matchList"></div>
 
+  <button id="exportCsvBtn">Export Matches CSV</button>
 </div>
 
-<script>
-(() => {
-  // Supabase config and client
-  const SUPABASE_URL = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U";
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-  // DOM elements
+  const SUPABASE_URL = 'https://vgcvemwzqyqwlwckoafu.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3ZlbXd6cXlxd2x3Y2tvYWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDk4NDIsImV4cCI6MjA3MDU4NTg0Mn0.zs5403wZkhPU1JU9AV0FVRUD_WBdf2oDV-eoKHmT-2U';
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const STORAGE_KEY = "padel_manager_data";
+
+  // UI elements
+  const authContainer = document.getElementById('authContainer');
+  const emailInput = document.getElementById('emailInput');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const authStatus = document.getElementById('authStatus');
+
+  const gameSetSelect = document.getElementById('gameSetSelect');
   const playerCountSelect = document.getElementById("playerCount");
   const playerNamesInput = document.getElementById("playerNames");
   const roundsInput = document.getElementById("rounds");
   const generateBtn = document.getElementById("generateBtn");
+  const saveSupabaseBtn = document.getElementById("saveSupabaseBtn");
   const scheduleOutput = document.getElementById("scheduleOutput");
   const scoreboardDiv = document.getElementById("scoreboard");
   const matchListDiv = document.getElementById("matchList");
   const exportCsvBtn = document.getElementById("exportCsvBtn");
-  const saveSupabaseBtn = document.getElementById("saveSupabaseBtn");
   const persistenceToggle = document.getElementById("persistenceToggle");
 
-  // State
+  // App state
+  let currentUser = null;
   let players = [];
   let playerCount = 5;
   let rounds = 15;
   let schedule = [];
-  let scores = []; // Array of { matchId, team1Score, team2Score }
-  let playerStats = {}; // playerName -> { points, games, index }
+  let scores = [];
+  let playerStats = {};
 
-  const STORAGE_KEY = "padel_manager_data";
+  // --- Scheduler functions ---
 
-  // --- Scheduler for 4 players ---
   function scheduleFourPlayers(players, rounds) {
     const combos = [
       [[players[0], players[1]], [players[2], players[3]]],
@@ -219,13 +247,13 @@
     return schedule;
   }
 
-  // --- Scheduler for 5 players ---
   function scheduleFivePlayers(players, rounds) {
     let schedule = [];
     let restingOrder = [...players];
     for(let i=0; i < rounds; i++) {
       let rest = restingOrder[0];
       let active = restingOrder.slice(1);
+
       let team1, team2;
       if (i % 2 === 0) {
         team1 = [active[0], active[1]];
@@ -234,6 +262,7 @@
         team1 = [active[1], active[0]];
         team2 = [active[3], active[2]];
       }
+
       schedule.push({
         id: i+1,
         team1,
@@ -267,7 +296,6 @@
       const t1score = parseInt(score.team1Score, 10) || 0;
       const t2score = parseInt(score.team2Score, 10) || 0;
 
-      // Assign points and games played to all players
       match.team1.forEach(p => {
         stats[p].points += t1score;
         stats[p].games++;
@@ -276,11 +304,6 @@
         stats[p].points += t2score;
         stats[p].games++;
       });
-
-      if (match.rest.length === 1) {
-        const restPlayer = match.rest[0];
-        // Optionally track rests if needed
-      }
     });
 
     Object.values(stats).forEach(s => {
@@ -294,6 +317,7 @@
       scheduleOutput.innerHTML = "<p>No schedule generated yet.</p>";
       return;
     }
+
     let html = `<table><thead><tr>
       <th>Match #</th>
       ${playerCount === 5 ? "<th>Resting</th>" : ""}
@@ -303,6 +327,7 @@
     schedule.forEach(match => {
       const restStr = playerCount === 5 ? `<td>${match.rest[0]}</td>` : "";
       const scoreObj = scores.find(s => s.matchId === match.id) || { team1Score: "", team2Score: "" };
+
       html += `<tr data-matchid="${match.id}">
         <td>${match.id}</td>
         ${restStr}
@@ -315,7 +340,6 @@
     html += "</tbody></table>";
     scheduleOutput.innerHTML = html;
 
-    // Attach event listeners for score inputs
     document.querySelectorAll(".score-input").forEach(input => {
       input.addEventListener("input", e => {
         const matchId = parseInt(e.target.dataset.match, 10);
@@ -404,14 +428,16 @@
     }
   }
 
-  function loadData() {
+  function loadLocalData() {
     try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (!data) return false;
-      players = data.players || [];
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data || !data.players || !data.schedule) return false;
+      players = data.players;
       playerCount = data.playerCount || 5;
       rounds = data.rounds || 15;
-      schedule = data.schedule || [];
+      schedule = data.schedule;
       scores = data.scores || [];
       playerCountSelect.value = playerCount;
       playerNamesInput.value = players.join(",");
@@ -419,102 +445,282 @@
       renderSchedule(schedule, playerCount);
       updateAfterScoreChange();
       return true;
-    } catch(e) {
-      console.warn("Failed to load data:", e);
+    } catch (e) {
+      console.warn("Failed to load local data:", e);
       return false;
     }
   }
 
-  function exportCsv() {
-    if (!schedule.length) {
-      alert("Generate a schedule first.");
+  // --- Supabase Authentication ---
+
+  loginBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      alert("Please enter your email");
       return;
     }
-    let csv = [];
-    let headers = ["Match ID", "Date/Time", "Team1 Player1", "Team1 Player2", "Team1 Score", "Team2 Player1", "Team2 Player2", "Team2 Score"];
-    if (playerCount === 5) headers.push("Resting Player");
-    csv.push(headers.join(","));
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { redirectTo: 'https://yourdomain.com' } });
+    if (error) {
+      alert("Failed to send magic link: " + error.message);
+    } else {
+      authStatus.textContent = "Magic link sent to your email. Please check.";
+    }
+  });
 
-    schedule.forEach(match => {
-      const scoreEntry = scores.find(s => s.matchId === match.id) || { team1Score: "", team2Score: "" };
-      const dt = new Date().toLocaleString();
-      let row = [
-        match.id,
-        dt,
-        match.team1[0],
-        match.team1[1],
-        scoreEntry.team1Score || "",
-        match.team2[0],
-        match.team2[1],
-        scoreEntry.team2Score || ""
-      ];
-      if (playerCount === 5) row.push(match.rest[0]);
-      csv.push(row.map(v => `"${v}"`).join(","));
-    });
+  logoutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+  });
 
-    const csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `padel_matches_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  supabase.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user ?? null;
+    updateAuthUI();
+    if (currentUser) {
+      loadGameSetsForUser(currentUser.id);
+    } else {
+      clearGameSets();
+    }
+  });
+
+  function updateAuthUI() {
+    if (currentUser) {
+      authStatus.textContent = `Logged in as: ${currentUser.email}`;
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      emailInput.style.display = "none";
+      saveSupabaseBtn.disabled = false;
+      generateBtn.disabled = false;
+    } else {
+      authStatus.textContent = "Not logged in";
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
+      emailInput.style.display = "inline-block";
+      saveSupabaseBtn.disabled = true;
+      generateBtn.disabled = false;
+      gameSetSelect.innerHTML = '<option value="">-- Login to see saved schedules --</option>';
+    }
   }
 
-  // --- Event Listeners ---
+  // --- Supabase Save & Load ---
 
-  generateBtn.addEventListener("click", () => {
-    playerCount = parseInt(playerCountSelect.value, 10);
-    rounds = parseInt(roundsInput.value, 10);
-    players = playerNamesInput.value.split(",").map(p => p.trim()).filter(p => p);
+  async function loadGameSetsForUser(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('game_sets')
+        .select('id, created_at, player_count, players, rounds')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    if (!validatePlayerNames(players, playerCount)) {
-      alert(`Please enter exactly ${playerCount} player names.`);
+      if (error) {
+        alert('Error loading schedules: ' + error.message);
+        return;
+      }
+
+      if (!data.length) {
+        gameSetSelect.innerHTML = '<option value="">-- No saved schedules found --</option>';
+        return;
+      }
+
+      gameSetSelect.innerHTML = '<option value="">-- Select a saved schedule --</option>';
+      data.forEach(gs => {
+        const playersStr = gs.players.join(", ");
+        const optionText = `${new Date(gs.created_at).toLocaleString()} | Players: ${gs.player_count} | ${playersStr}`;
+        const option = document.createElement("option");
+        option.value = gs.id;
+        option.textContent = optionText;
+        gameSetSelect.appendChild(option);
+      });
+    } catch (e) {
+      alert("Unexpected error loading schedules");
+    }
+  }
+
+  function clearGameSets() {
+    gameSetSelect.innerHTML = '<option value="">-- Login to see saved schedules --</option>';
+  }
+
+  gameSetSelect.addEventListener("change", async (e) => {
+    const id = e.target.value;
+    if (!id) return;
+
+    const { data, error } = await supabase
+      .from('game_sets')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', currentUser.id)
+      .single();
+
+    if (error) {
+      alert("Failed to load schedule: " + error.message);
       return;
     }
 
-    if (playerCount === 4) {
-      schedule = scheduleFourPlayers(players, rounds);
-    } else {
-      schedule = scheduleFivePlayers(players, rounds);
+    players = data.players;
+    playerCount = data.player_count;
+    rounds = data.rounds;
+
+    playerCountSelect.value = playerCount;
+    playerNamesInput.value = players.join(",");
+    roundsInput.value = rounds;
+
+    // Load associated games & scores
+    const { data: gamesData, error: gamesError } = await supabase
+      .from('padel_games')
+      .select('*')
+      .eq('game_set_id', id)
+      .eq('user_id', currentUser.id)
+      .order('id');
+
+    if (gamesError) {
+      alert("Failed to load games: " + gamesError.message);
+      return;
     }
 
+    schedule = [];
     scores = [];
+
+    gamesData.forEach(g => {
+      schedule.push({
+        id: g.match_id,
+        team1: [g.team1_player1, g.team1_player2],
+        team2: [g.team2_player1, g.team2_player2],
+        rest: g.resting_player ? [g.resting_player] : []
+      });
+      scores.push({
+        matchId: g.match_id,
+        team1Score: g.team1_score,
+        team2Score: g.team2_score
+      });
+    });
+
     renderSchedule(schedule, playerCount);
     updateAfterScoreChange();
   });
 
-  exportCsvBtn.addEventListener("click", exportCsv);
-
   saveSupabaseBtn.addEventListener("click", async () => {
+    if (!currentUser) {
+      alert("You must be logged in to save schedules.");
+      return;
+    }
+
     if (!schedule.length) {
-      alert("Generate a schedule first before saving.");
+      alert("No schedule to save. Generate one first.");
       return;
     }
 
     try {
-      const toSave = {
-        player_count: playerCount,
-        players,
-        rounds,
-        schedule: JSON.stringify(schedule),
-        scores: JSON.stringify(scores),
-        created_at: new Date().toISOString(),
-      };
+      // Insert or update game_sets row
+      const { data: insertData, error: insertError } = await supabase
+        .from('game_sets')
+        .insert([{
+          player_count: playerCount,
+          players: players,
+          rounds: rounds,
+          user_id: currentUser.id
+        }])
+        .select()
+        .single();
 
-      const { data, error } = await supabase
-        .from('padel_matches')
-        .insert([toSave]);
+      if (insertError) {
+        alert("Error saving schedule: " + insertError.message);
+        return;
+      }
 
-      if (error) {
-        alert("Failed to save schedule: " + error.message);
+      const gameSetId = insertData.id;
+
+      // Remove any existing padel_games for this game_set_id and user
+      await supabase
+        .from('padel_games')
+        .delete()
+        .eq('game_set_id', gameSetId)
+        .eq('user_id', currentUser.id);
+
+      // Insert padel_games with scores
+      const gamesToInsert = schedule.map(match => {
+        const score = scores.find(s => s.matchId === match.id) || { team1Score: "", team2Score: "" };
+        return {
+          game_set_id: gameSetId,
+          user_id: currentUser.id,
+          match_id: match.id,
+          team1_player1: match.team1[0],
+          team1_player2: match.team1[1],
+          team2_player1: match.team2[0],
+          team2_player2: match.team2[1],
+          resting_player: (playerCount === 5) ? (match.rest[0] || null) : null,
+          team1_score: score.team1Score || null,
+          team2_score: score.team2Score || null,
+        };
+      });
+
+      const { error: gamesInsertError } = await supabase
+        .from('padel_games')
+        .insert(gamesToInsert);
+
+      if (gamesInsertError) {
+        alert("Error saving games: " + gamesInsertError.message);
         return;
       }
 
       alert("Schedule and scores saved successfully!");
-    } catch (err) {
-      alert("Unexpected error saving data: " + err.message);
+      // Refresh saved schedules list
+      loadGameSetsForUser(currentUser.id);
+
+    } catch (e) {
+      alert("Unexpected error saving schedule.");
+    }
+  });
+
+  // --- Generate & Save local data ---
+
+  generateBtn.addEventListener("click", () => {
+    playerCount = parseInt(playerCountSelect.value, 10);
+    players = playerNamesInput.value.split(",").map(p => p.trim()).filter(Boolean);
+    rounds = parseInt(roundsInput.value, 10);
+
+    if (!validatePlayerNames(players, playerCount)) {
+      alert(`Please enter exactly ${playerCount} player names, comma separated.`);
+      return;
+    }
+
+    if (rounds < 1) {
+      alert("Rounds must be at least 1");
+      return;
+    }
+
+    schedule = playerCount === 4
+      ? scheduleFourPlayers(players, rounds)
+      : scheduleFivePlayers(players, rounds);
+
+    scores = [];
+    renderSchedule(schedule, playerCount);
+    updateAfterScoreChange();
+    if (persistenceToggle.checked) saveData();
+  });
+
+  exportCsvBtn.addEventListener("click", () => {
+    if (!schedule.length) {
+      alert("No schedule to export.");
+      return;
+    }
+    let csv = "Match ID,Resting,Team 1,Team 1 Score,Team 2,Team 2 Score\n";
+    schedule.forEach(match => {
+      const score = scores.find(s => s.matchId === match.id) || { team1Score: "", team2Score: "" };
+      csv += `${match.id},${playerCount === 5 ? match.rest[0] : ""},` +
+        `"${match.team1.join(" & ")}",${score.team1Score || ""},` +
+        `"${match.team2.join(" & ")}",${score.team2Score || ""}\n`;
+    });
+    const blob = new Blob([csv], {type: "text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "padel_schedule.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Load local data on page load if persistence is enabled
+  window.addEventListener("load", () => {
+    if (persistenceToggle.checked) {
+      loadLocalData();
     }
   });
 
@@ -526,12 +732,6 @@
     }
   });
 
-  // Load saved data if available on page load
-  if (persistenceToggle.checked) {
-    loadData();
-  }
-
-})();
 </script>
 
 </body>
