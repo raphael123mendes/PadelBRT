@@ -27,6 +27,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            z-index: 1000;
         }
         .modal-content {
             background-color: white;
@@ -62,6 +63,14 @@
                 Organize and score your Padel games with ease.
             </p>
         </header>
+        
+        <!-- Button Section for Generate and Reset -->
+        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8 justify-end">
+            <button id="reset-button"
+                class="w-full sm:w-auto px-6 py-3 rounded-full text-white font-bold bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-200 shadow-md transform hover:scale-105 hidden">
+                Reset Game
+            </button>
+        </div>
 
         <!-- Player Setup Section -->
         <div id="setup-section" class="bg-gray-50 dark:bg-gray-700 p-4 sm:p-6 rounded-xl shadow-lg transition-colors duration-300">
@@ -91,10 +100,6 @@
                 <button id="generate-button"
                     class="w-full px-6 py-3 rounded-full text-white font-bold bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-md transform hover:scale-105">
                     Generate Games
-                </button>
-                <button id="reset-button"
-                    class="w-full px-6 py-3 rounded-full text-white font-bold bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-200 shadow-md transform hover:scale-105 hidden">
-                    Reset Game
                 </button>
             </div>
         </div>
@@ -188,7 +193,8 @@
             const shuffledPairings = pairings.sort(() => Math.random() - 0.5);
 
             state.games = [];
-            for (let i = 0; i < 12; i++) { // Generate 12 games total, cycling through the 3 pairings
+            // Change the loop to generate 15 games for 5 rounds
+            for (let i = 0; i < 15; i++) { 
                 const game = shuffledPairings[i % 3];
                 state.games.push({
                     id: state.games.length + 1,
